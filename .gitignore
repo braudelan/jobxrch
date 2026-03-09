@@ -37,6 +37,9 @@ wheels/
 .env
 .env.local
 
+# Browser session
+.session/
+
 # Testing
 .pytest_cache/
 .coverage

@@ -1,47 +1,37 @@
 # main.py
 import os
-import pandas as pd
-from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
-from src.scraper.crawler import LinkedInCrawler
+from src.scraper.crawler import scrape_all_saved_jobs
+from src.fetcher.fetcher import fetch_job_description
 
-# 1. Load configuration
-load_dotenv() 
-LI_AT_COOKIE = os.getenv("LI_AT_COOKIE")
+SESSION_DIR = os.path.join(os.path.dirname(__file__), ".session")
+
 
 def run_pipeline():
-    if not LI_AT_COOKIE:
-        print("Error: LI_AT_COOKIE not found in .env file.")
-        return
-
     with sync_playwright() as p:
-        # 2. Setup Browser
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
-        context.add_cookies([{
-            "name": "li_at",
-            "value": LI_AT_COOKIE,
-            "domain": ".linkedin.com",
-            "path": "/"
-        }])
-        
+        # 1. Launch persistent context (saves session to disk)
+        context = p.chromium.launch_persistent_context(
+            user_data_dir=SESSION_DIR,
+            headless=False,
+        )
         page = context.new_page()
+
+        # 2. If not logged in, wait for user to log in manually
+        page.goto("https://www.linkedin.com/my-items/saved-jobs/")
+        if "login" in page.url or "authwall" in page.url:
+            print("Not logged in. Please log into LinkedIn in the browser window, then press Enter here...")
+            input()
+
         print("Initialization complete. Starting Crawler...")
 
-        # 3. Execute Scrape
-        crawler = LinkedInCrawler(page)
-        page.goto("https://www.linkedin.com/my-items/saved-jobs/")
-        
-        results = crawler.scrape_all_saved_jobs()
-        
-        # 4. Save Data
-        if results:
-            df = pd.DataFrame(results)
-            os.makedirs("data", exist_ok=True)
-            df.to_csv("data/linkedin_saved_jobs.csv", index=False)
-            print(f"Pipeline finished. {len(df)} jobs saved to data/linkedin_saved_jobs.csv")
-        
-        browser.close()
+        # 3. Crawl saved jobs
+        results = scrape_all_saved_jobs(page)
+        print(f"Found {len(results)} jobs (showing first 10):")
+        for i, job in enumerate(results[:10]):
+            print(f"  {i + 1}. {job['job_title']} at {job['company']}")
+
+        context.close()
+
 
 if __name__ == "__main__":
     run_pipeline()
