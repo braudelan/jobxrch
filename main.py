@@ -26,9 +26,14 @@ def run_pipeline():
 
         # 3. Crawl saved jobs
         results = scrape_all_saved_jobs(page)
-        print(f"Found {len(results)} jobs (showing first 10):")
-        for i, job in enumerate(results[:10]):
-            print(f"  {i + 1}. {job['job_title']} at {job['company']}")
+        print(f"Found {len(results)} jobs. Fetching first job description as smoke test...")
+
+        # 4. Fetch JD for first 5 jobs as a smoke test
+        if results:
+            for job in results[:5]:
+                print(f"Fetching: {job['job_title']} at {job['company']}")
+                job["description"] = fetch_job_description(context, job["link"])
+                print(f"--- Description preview ---\n{job['description'][:500]}")
 
         context.close()
 
