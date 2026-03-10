@@ -44,3 +44,6 @@ wheels/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# DB files
+data/jobs.db
