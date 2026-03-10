@@ -32,7 +32,9 @@ def scrape_all_saved_jobs(page: Page) -> list:
         for card in cards:
             raw_text = card.inner_text()
             raw_link = card.locator('a[href*="/jobs/view/"]').first.get_attribute("href")
-            all_jobs.append(clean_job_card_data(raw_text, raw_link))
+            job = clean_job_card_data(raw_text, raw_link)
+            job["source"] = "linkedin"
+            all_jobs.append(job)
 
         if not _go_to_next_page(page):
             break
