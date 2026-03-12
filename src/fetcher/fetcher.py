@@ -15,7 +15,7 @@ def _extract_job_description(page: Page) -> str:
     try:
         box = page.locator('[data-testid="expandable-text-box"]').first
         box.wait_for(timeout=10000)
-        return box.inner_text()
+        return box.inner_text().removesuffix("\n…\nmore").strip()
     except Exception as e:
         print(f"Could not extract JD: {e}")
         return ""

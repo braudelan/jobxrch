@@ -3,7 +3,8 @@ import os
 from playwright.sync_api import sync_playwright
 from src.scraper.crawler import scrape_all_saved_jobs
 from src.fetcher.fetcher import fetch_job_description
-from src.db.database import init_db, is_job_saved, save_job
+from src.db.database import init_db, is_job_saved, save_job, get_job_id, save_evaluation
+from src.evaluator.evaluator import evaluate_job
 
 SESSION_DIR = os.path.join(os.path.dirname(__file__), ".session")
 
@@ -35,9 +36,15 @@ def run_pipeline():
             job["description"] = fetch_job_description(context, job["link"])
             save_job(job)
 
+            print(f"[{i}/{len(new_jobs)}] Evaluating...")
+            assessment, chash = evaluate_job(job)
+            job_id = get_job_id(job["link"])
+            save_evaluation(job_id, chash, assessment)
+            print(f"[{i}/{len(new_jobs)}] Done.\n")
+
         context.close()
 
-    print("Done.")
+    print("All done.")
 
 
 if __name__ == "__main__":
