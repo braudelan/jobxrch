@@ -47,3 +47,6 @@ htmlcov/
 
 # DB files
 data/jobs.db
+
+# Claude
+.claude/
