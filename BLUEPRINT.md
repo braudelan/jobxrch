@@ -1,8 +1,8 @@
 # Job Evaluator — Blueprint
 
-## North Star
+## What is it?
 
-A personal tool to quickly and efficiently evaluate job offers from any source against your aspirations, needs, and capabilities — powered by an LLM.
+A local job evaluation dashboard — a personal tool that scrapes job postings, scores them via LLM, and helps track and prioritize applications.
 
 ---
 
@@ -28,9 +28,9 @@ A personal tool to quickly and efficiently evaluate job offers from any source a
 | Stage | Responsibility | Status |
 |---|---|---|
 | **Ingest** | Receive raw job data (title, company, location, link) from any source | Partial (LinkedIn scraper only) |
-| **Fetch** | Given a link, retrieve the full job description | Done (Currently only works for Linkedin) |
-| **Evaluate** | Run job + criteria through LLM, produce human-language assessment | Not started |
-| **Store** | Persist job data and evaluation output to DB | Done (job data only) |
+| **Fetch** | Given a link, retrieve the full job description | Done (LinkedIn only) |
+| **Evaluate** | Run job + criteria through LLM, return structured JSON (score, summary, assessment) | In progress |
+| **Store** | Persist job data and evaluation output to DB | Done |
 
 ### Pipeline Modes (future)
 
@@ -47,9 +47,9 @@ A personal tool to quickly and efficiently evaluate job offers from any source a
 - **LinkedIn saved jobs scraper** — crawls saved jobs list, extracts basic card data, fetches JDs via Playwright
 
 ### Planned
+- **Web dashboard** — paste a URL directly into the dashboard to trigger the full fetch-evaluate pipeline
 - **Additional scrapers** — for other job boards and sources
-- **Chrome extension** — send basic job data + link directly to the pipeline from any job board
-- **Manual paste** — CLI or UI input for job data without a link, or with a pre-known JD
+- **Chrome extension** — one-click evaluation from any job posting page (convenience layer on top of the dashboard ingest)
 
 > All ingest sources are adapters — regardless of origin, they must produce a normalized job object conforming to the design contract below before entering the pipeline.
 
@@ -78,16 +78,29 @@ If `description` is null and `link` is provided, the Fetch stage runs. If both a
 - Criteria file — a plain text document describing your ideal role, skills, priorities, and dealbreakers (user-maintained)
 
 ### Output
-- Human-language assessment of fit and misfit against criteria
-- Stored alongside the job in the DB
+Structured JSON with three fields:
+- **score** — numeric 1–10 fit score
+- **summary** — 2 sentence max, for list views
+- **assessment** — full reasoning
+
+Parse failures fall back gracefully: score 0, raw response preserved.
+
+> Note: score reliability requires prompt engineering iteration — scores should not be trusted for sorting until the prompt is validated.
 
 ### Re-evaluation
-- Supported manually (e.g. `re-evaluate` command)
-- Triggered when criteria change or when explicitly requested
+- Supported manually (e.g. `re-evaluate` command or dashboard button)
+- Triggered when criteria change or explicitly requested
 - Each evaluation is versioned — old evaluations are not overwritten
 
+### Batch Prioritization
+- LLM ranks a set of jobs comparatively, not in isolation
+- Results are cached with a timestamp
+- Cache invalidated when scores or criteria change
+- Not a replacement for per-job evaluation — a complementary view
+
 ### LLM
-- Anthropic Claude (via API)
+- Provider-agnostic — swap via `LLM_PROVIDER` env var
+- Currently: Anthropic Claude
 - Model and prompt configurable
 
 ---
@@ -104,16 +117,49 @@ If `description` is null and `link` is provided, the Fetch stage runs. If both a
 | `link` | TEXT UNIQUE | Natural dedup key |
 | `description` | TEXT | Full JD |
 | `source` | TEXT | e.g. `linkedin`, `manual`, `extension` |
+| `status` | TEXT | `saved` → `applied` → `in-process` → `offer` / `rejected` |
+| `deleted` | INTEGER | Soft delete flag (0/1) |
 | `scraped_at` | TEXT | ISO 8601 UTC |
 
-### `evaluations` table (planned)
+### `evaluations` table
 | Column | Type | Notes |
 |---|---|---|
 | `id` | INTEGER PK | |
 | `job_id` | INTEGER FK | References `jobs.id` |
-| `criteria_version` | TEXT | Hash or label of the criteria file used |
-| `assessment` | TEXT | LLM output |
+| `criteria_hash` | TEXT | Hash of criteria file at evaluation time |
+| `score` | INTEGER | 1–10 |
+| `summary` | TEXT | 2-sentence max |
+| `assessment` | TEXT | Full LLM reasoning |
 | `evaluated_at` | TEXT | ISO 8601 UTC |
+
+---
+
+## Dashboard
+
+**Stack:** FastAPI + Jinja2 + vanilla JS + Pico.css. No build step, localhost only.
+
+### Views & Routes
+
+| View | Route | Purpose |
+|---|---|---|
+| Main list | `GET /` | Sortable table of jobs by score |
+| Evaluate | `POST /jobs/evaluate` | Submit URL → fetch → score → persist |
+| Detail | `GET /jobs/<id>` | Full assessment + metadata |
+| Prioritize | `POST /jobs/prioritize` | Cached LLM batch ranking |
+| Status update | `POST /jobs/<id>/status` | Inline status change |
+| Delete/Restore | `POST /jobs/<id>/delete` + `/restore` | Soft delete management |
+
+### Job Lifecycle
+Status flows linearly: `saved → applied → in-process → offer | rejected`
+- No arbitrary jumping forward
+- One step back allowed (misclick protection)
+- Deleted jobs hidden by default, recoverable via toggle
+
+### UI Principles
+- Pinned "evaluate a job" URL input bar at top of list view
+- Prioritize button triggers batch ranking
+- Click-to-expand rows for summary → full assessment
+- Minimal, functional — no JS framework, no Tailwind
 
 ---
 
@@ -121,7 +167,7 @@ If `description` is null and `link` is provided, the Fetch stage runs. If both a
 
 ```
 job-scraper/
-├── main.py                  # Entry point, orchestrates the pipeline
+├── main.py                  # CLI pipeline entry point
 ├── criteria.txt             # User-maintained evaluation criteria
 ├── data/
 │   └── jobs.db              # SQLite database
@@ -129,7 +175,8 @@ job-scraper/
 │   ├── scraper/             # LinkedIn crawler + card parser
 │   ├── fetcher/             # JD fetcher (Playwright)
 │   ├── db/                  # DB init, read, write
-│   └── evaluator/           # LLM evaluation logic (planned)
+│   ├── evaluator/           # LLM evaluation logic + providers
+│   └── dashboard/           # FastAPI app + templates (planned)
 └── tests/
 ```
 
@@ -137,18 +184,15 @@ job-scraper/
 
 ## Immediate Next Steps
 
-1. Add `source` column to `jobs` table
-2. Build `evaluator` module — criteria loading, prompt construction, LLM call
-3. Wire evaluation into the main pipeline
-4. Add `evaluations` table and persistence
+1. Update evaluator to return structured JSON (score, summary, assessment)
+2. Update DB schema — add score, summary to evaluations; status, deleted to jobs
+3. Build FastAPI dashboard
 
 ---
 
 ## Future Directions
 
-- Chrome extension as an ingest source
-- Web UI / dashboard for browsing jobs and evaluations
+- Chrome extension as a convenience ingest layer
 - Staleness-based re-fetch (jobs older than N days)
 - Criteria versioning and diff
 - Multi-criteria profiles (e.g. "dream job" vs "acceptable")
-- Application status tracking — add a `status` column to `jobs` with lifecycle: `saved` (default) → `applied` → `in-process` → `rejected` / `offer`
