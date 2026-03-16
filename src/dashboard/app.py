@@ -1,18 +1,22 @@
 # src/dashboard/app.py
 import os
-from fastapi import FastAPI, Request, Form
+from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from playwright.sync_api import sync_playwright
 from src.db.database import (
     init_db, is_job_saved, save_job, get_job_by_link,
-    get_job_id, save_evaluation, get_jobs_with_latest_evaluation
+    get_job_id, save_evaluation, get_jobs_with_latest_evaluation,
+    update_job_status, get_job_with_evaluation, delete_job,
 )
 from src.fetcher.fetcher import fetch_job_description
 from src.evaluator.evaluator import evaluate_job
 
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".session")
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
+
+ALL_STATUSES = ["saved", "applied", "in-process", "offer", "rejected"]
+STATUS_FLOW = {s: [t for t in ALL_STATUSES if t != s] for s in ALL_STATUSES}
 
 app = FastAPI()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -26,7 +30,11 @@ def startup():
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     jobs = get_jobs_with_latest_evaluation()
-    return templates.TemplateResponse("index.html", {"request": request, "jobs": jobs})
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "jobs": jobs,
+        "status_flow": STATUS_FLOW,
+    })
 
 
 @app.post("/jobs/evaluate")
@@ -52,4 +60,28 @@ def evaluate(url: str = Form(...)):
     result, chash = evaluate_job(job)
     save_evaluation(get_job_id(url), chash, result)
 
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/jobs/{job_id}/status")
+def set_status(job_id: int, status: str = Form(...)):
+    update_job_status(job_id, status)
+    return RedirectResponse("/", status_code=303)
+
+
+@app.get("/jobs/{job_id}", response_class=HTMLResponse)
+def job_detail(request: Request, job_id: int):
+    job = get_job_with_evaluation(job_id)
+    if not job:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse("job_detail.html", {
+        "request": request,
+        "job": job,
+        "status_flow": STATUS_FLOW,
+    })
+
+
+@app.post("/jobs/{job_id}/delete")
+def delete(job_id: int):
+    delete_job(job_id)
     return RedirectResponse("/", status_code=303)

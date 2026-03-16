@@ -3,65 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Evaluator</title>
+    <title>jobXrch</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <style>
-        body { max-width: 960px; margin: 0 auto; padding: 2rem; }
-        .score { font-weight: bold; font-size: 1.2rem; }
+        body { max-width: 1600px; margin: 0 auto; padding: 1rem; font-size: 0.82rem; }
+
+        /* Layout */
+        .layout { display: flex; gap: 0; align-items: flex-start; }
+        .sidebar-wrap { flex-shrink: 0; position: sticky; top: 1rem; }
+        .sidebar { width: 200px; padding-right: 1rem; overflow: hidden; transition: width 0.2s, padding 0.2s; }
+        .sidebar.collapsed { width: 0; padding-right: 0; }
+        .sidebar section { margin-bottom: 1.25rem; }
+        .sidebar section h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pico-muted-color); margin-bottom: 0.5rem; }
+        .sidebar input, .sidebar button { font-size: 0.8rem; }
+        .toggle-btn { background: none; border: none; cursor: pointer; color: var(--pico-muted-color); font-size: 1rem; padding: 0.2rem 0.4rem; margin-bottom: 0.5rem; line-height: 1; }
+        .toggle-btn:hover { color: var(--pico-color); }
+        .main { flex: 1; min-width: 0; }
+
+        /* Score */
+        .score { font-weight: bold; font-size: 0.9rem; }
         .score-high { color: #2a9d5c; }
         .score-mid  { color: #e8a020; }
         .score-low  { color: #c0392b; }
-        summary { cursor: pointer; }
-        .meta { color: var(--pico-muted-color); font-size: 0.85rem; }
+
+        /* Meta text */
+        .meta { color: var(--pico-muted-color); font-size: 0.75rem; }
+
+        /* Expandable text */
+        .expandable details { margin-top: 0.2rem; }
+        .expandable summary { cursor: pointer; font-size: 0.72rem; color: var(--pico-muted-color); list-style: none; }
+        .expandable summary::before { content: "▶ show more"; }
+        .expandable details[open] summary::before { content: "▲ show less"; }
+        .expandable .preview { font-size: 0.8rem; }
+        .expandable .full-text {
+            font-size: 0.78rem;
+            white-space: pre-wrap;
+            margin-top: 0.4rem;
+            max-height: 300px;
+            overflow-y: auto;
+            border-left: 2px solid var(--pico-muted-border-color);
+            padding-left: 0.6rem;
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+        .status-saved      { background: #e8e8e8; color: #555; }
+        .status-applied    { background: #dbeafe; color: #1d4ed8; }
+        .status-in-process { background: #fef3c7; color: #92400e; }
+        .status-offer      { background: #d1fae5; color: #065f46; }
+        .status-rejected   { background: #fee2e2; color: #991b1b; }
+
+        /* Status form */
+        .status-form { display: flex; gap: 0.25rem; align-items: center; margin: 0; }
+        .status-form select { font-size: 0.72rem; padding: 0.15rem 0.3rem; margin: 0; height: auto; }
+
+        /* Filter pills */
+        .filter-pills { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+        .pill { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 999px; padding: 0.2rem 0.75rem; font-size: 0.75rem; cursor: pointer; color: var(--pico-muted-color); }
+        .pill.active { background: var(--pico-primary); border-color: var(--pico-primary); color: #fff; }
+        .pill:hover:not(.active) { border-color: var(--pico-primary); color: var(--pico-primary); }
+
+        /* Table layout */
+        table { table-layout: fixed; width: 100%; font-size: 0.8rem; }
+        th:nth-child(1) { width: 200px; }  /* Title */
+        th:nth-child(2) { width: 140px; }  /* Company */
+        th:nth-child(3) { }                /* Summary (flex) */
+        th:nth-child(4) { width: 60px; }   /* Score */
+        th:nth-child(5) { width: 130px; }  /* Status */
+        th { white-space: nowrap; font-size: 0.75rem; cursor: pointer; user-select: none; }
+        th:hover { color: var(--pico-primary); }
+        th.sort-asc::after  { content: " ▲"; font-size: 0.65rem; }
+        th.sort-desc::after { content: " ▼"; font-size: 0.65rem; }
+        td { vertical-align: top; padding-top: 0.4rem; padding-bottom: 0.4rem; }
+
+        /* Header */
+        .site-header { text-align: left; padding: 1.5rem 0 1rem; }
+        .site-header h1 {
+            font-size: 2.5rem;
+            font-weight: 750;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, var(--pico-primary) 0%, #346cdb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin: 0.5;
+        }
     </style>
 </head>
 <body>
-    <h1>Job Evaluator</h1>
+    <header class="site-header">
+        <h1>job<span style="font-size: 1.2em; line-height: 1;">X</span>rch</h1>
+    </header>
 
-    <form method="post" action="/jobs/evaluate">
-        <fieldset role="group">
-            <input type="url" name="url" placeholder="Paste a LinkedIn job URL..." required>
-            <button type="submit">Evaluate</button>
-        </fieldset>
-    </form>
+    <div class="layout">
 
-    <hr>
+    <div class="sidebar-wrap">
+        <button class="toggle-btn" onclick="document.querySelector('.sidebar').classList.toggle('collapsed')" title="Toggle panel">&#9776;</button>
+        <aside class="sidebar">
+            <section>
+                <h3>Ingest</h3>
+                <form method="post" action="/jobs/evaluate">
+                    <input type="url" name="url" placeholder="Paste a LinkedIn URL…" required style="margin-bottom: 0.4rem;">
+                    <button type="submit" style="width: 100%;">Evaluate</button>
+                </form>
+            </section>
+        </aside>
+    </div>
+
+    <div class="main">
 
     {% if jobs %}
+    <div class="filter-pills">
+        <button class="pill active" data-filter="saved">Saved</button>
+        <button class="pill active" data-filter="applied">Applied</button>
+        <button class="pill active" data-filter="in-process">In-process</button>
+        <button class="pill active" data-filter="offer">Offer</button>
+        <button class="pill" data-filter="rejected">Rejected</button>
+    </div>
     <table>
         <thead>
             <tr>
-                <th>Score</th>
-                <th>Job</th>
+                <th>Title</th>
                 <th>Company</th>
                 <th>Summary</th>
+                <th>Score</th>
+                <th>Status</th>
             </tr>
         </thead>
         <tbody>
         {% for job in jobs %}
-            <tr>
+            <tr data-status="{{ job.status }}">
+
+                {# Title #}
+                <td>
+                    <a href="/jobs/{{ job.id }}">{{ job.job_title }}</a>
+                </td>
+
+                {# Company + location #}
+                <td>
+                    <span>{{ job.company }}</span><br>
+                    <span class="meta">{{ job.location }}</span>
+                </td>
+
+                {# Evaluation summary #}
+                <td>
+                    {% if job.summary %}
+                        <span class="preview">{{ job.summary }}</span>
+                    {% else %}
+                        <span class="meta">Not evaluated</span>
+                    {% endif %}
+                </td>
+
+                {# Score #}
                 <td>
                     {% if job.score %}
                         {% if job.score >= 7 %}
-                            <span class="score score-high">{{ job.score }}/10</span>
+                            <span class="score score-high">{{ job.score }}</span>
                         {% elif job.score >= 4 %}
-                            <span class="score score-mid">{{ job.score }}/10</span>
+                            <span class="score score-mid">{{ job.score }}</span>
                         {% else %}
-                            <span class="score score-low">{{ job.score }}/10</span>
+                            <span class="score score-low">{{ job.score }}</span>
                         {% endif %}
                     {% else %}
                         <span class="meta">—</span>
                     {% endif %}
                 </td>
-                <td><a href="{{ job.link }}" target="_blank">{{ job.job_title }}</a></td>
-                <td>{{ job.company }}<br><span class="meta">{{ job.location }}</span></td>
-                <td>{{ job.summary or "Not evaluated" }}</td>
+
+                {# Status: badge + transition select #}
+                <td>
+                    <span class="status-badge status-{{ job.status }}">{{ job.status }}</span>
+                    {% set allowed = status_flow[job.status] %}
+                    {% if allowed %}
+                    <form method="post" action="/jobs/{{ job.id }}/status" class="status-form">
+                        <select name="status" onchange="this.form.submit()">
+                            <option value="" disabled selected>move to…</option>
+                            {% for s in allowed %}
+                            <option value="{{ s }}">{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </form>
+                    {% endif %}
+                </td>
+
             </tr>
         {% endfor %}
         </tbody>
     </table>
     {% else %}
-        <p>No jobs yet. Paste a URL above to get started.</p>
+        <p>No jobs yet. Paste a URL in the panel to get started.</p>
     {% endif %}
+
+    </div>{# /.main #}
+    </div>{# /.layout #}
+    <script>
+    document.querySelectorAll('thead th').forEach((th, col) => {
+        th.addEventListener('click', () => {
+            const table = th.closest('table');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const asc = !th.classList.contains('sort-asc');
+
+            table.querySelectorAll('th').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+            th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+            rows.sort((a, b) => {
+                const aText = a.cells[col]?.innerText.trim() ?? '';
+                const bText = b.cells[col]?.innerText.trim() ?? '';
+                const aNum = parseFloat(aText);
+                const bNum = parseFloat(bText);
+                const numeric = !isNaN(aNum) && !isNaN(bNum);
+                const cmp = numeric ? aNum - bNum : aText.localeCompare(bText);
+                return asc ? cmp : -cmp;
+            });
+
+            rows.forEach(r => tbody.appendChild(r));
+        });
+    });
+
+    // Default sort: score (col 3) descending
+    const scoreTh = document.querySelectorAll('thead th')[3];
+    if (scoreTh) {
+        scoreTh.classList.add('sort-asc'); // trick sort into flipping to desc
+        scoreTh.click();
+    }
+
+    function applyFilter() {
+        const active = new Set(
+            [...document.querySelectorAll('.pill.active')].map(p => p.dataset.filter)
+        );
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.style.display = active.has(row.dataset.status) ? '' : 'none';
+        });
+    }
+
+    document.querySelectorAll('.pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            pill.classList.toggle('active');
+            applyFilter();
+        });
+    });
+
+    applyFilter();
+    </script>
 </body>
 </html>

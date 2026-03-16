@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ job.job_title }} — Job Evaluator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { max-width: 860px; margin: 0 auto; padding: 1.5rem; font-size: 0.85rem; }
+
+        .back { font-size: 0.8rem; color: var(--pico-muted-color); text-decoration: none; display: inline-block; margin-bottom: 1rem; }
+        .back:hover { color: var(--pico-primary); }
+
+        h2 { margin-bottom: 0.25rem; }
+        .title-row { display: flex; align-items: baseline; gap: 0.5rem; }
+        .ext-link { font-size: 0.75rem; color: var(--pico-muted-color); }
+
+        .meta-row { color: var(--pico-muted-color); font-size: 0.78rem; margin-bottom: 1rem; }
+        .meta-row span + span::before { content: " · "; }
+
+        /* Score badge */
+        .score-badge { display: inline-block; font-weight: bold; font-size: 1.1rem; padding: 0.2rem 0.6rem; border-radius: 6px; margin-right: 0.5rem; }
+        .score-high { color: #2a9d5c; }
+        .score-mid  { color: #e8a020; }
+        .score-low  { color: #c0392b; }
+
+        .eval-meta { font-size: 0.75rem; color: var(--pico-muted-color); }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-block;
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-saved      { background: #e8e8e8; color: #555; }
+        .status-applied    { background: #dbeafe; color: #1d4ed8; }
+        .status-in-process { background: #fef3c7; color: #92400e; }
+        .status-offer      { background: #d1fae5; color: #065f46; }
+        .status-rejected   { background: #fee2e2; color: #991b1b; }
+
+        .status-row { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0; }
+        .status-form { display: flex; gap: 0.25rem; align-items: center; margin: 0; }
+        .status-form select { font-size: 0.78rem; padding: 0.15rem 0.3rem; margin: 0; height: auto; }
+
+        section.card { border: 1px solid var(--pico-muted-border-color); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+        section.card h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pico-muted-color); margin-bottom: 0.5rem; }
+
+        .assessment-block { white-space: pre-wrap; font-size: 0.82rem; line-height: 1.5; }
+        .description-block { white-space: pre-wrap; font-size: 0.8rem; line-height: 1.5; max-height: 500px; overflow-y: auto; }
+
+        details summary { cursor: pointer; font-size: 0.8rem; color: var(--pico-muted-color); list-style: none; }
+        details summary::before { content: "▶ Show description"; }
+        details[open] summary::before { content: "▲ Hide description"; }
+
+        .delete-form { margin-top: 2rem; }
+        .delete-btn { background: none; border: 1px solid #c0392b; color: #c0392b; font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer; }
+        .delete-btn:hover { background: #fee2e2; }
+    </style>
+</head>
+<body>
+    <a class="back" href="/">← Back to list</a>
+
+    <div class="title-row">
+        <h2>{{ job.job_title }}</h2>
+        {% if job.link %}
+        <a class="ext-link" href="{{ job.link }}" target="_blank">↗ open posting</a>
+        {% endif %}
+    </div>
+
+    <p class="meta-row">
+        <span>{{ job.company }}</span>
+        <span>{{ job.location }}</span>
+        <span>{{ job.source }}</span>
+        <span>{{ job.scraped_at[:10] if job.scraped_at else '' }}</span>
+    </p>
+
+    {# Score + evaluated_at #}
+    {% if job.score %}
+    <div>
+        {% if job.score >= 7 %}
+            <span class="score-badge score-high">{{ job.score }}/10</span>
+        {% elif job.score >= 4 %}
+            <span class="score-badge score-mid">{{ job.score }}/10</span>
+        {% else %}
+            <span class="score-badge score-low">{{ job.score }}/10</span>
+        {% endif %}
+        {% if job.evaluated_at %}
+        <span class="eval-meta">evaluated {{ job.evaluated_at[:10] }}</span>
+        {% endif %}
+    </div>
+    {% else %}
+    <p class="eval-meta">Not yet evaluated.</p>
+    {% endif %}
+
+    {# Status row #}
+    <div class="status-row">
+        <span class="status-badge status-{{ job.status }}">{{ job.status }}</span>
+        {% set allowed = status_flow[job.status] %}
+        {% if allowed %}
+        <form method="post" action="/jobs/{{ job.id }}/status" class="status-form">
+            <select name="status" onchange="this.form.submit()">
+                <option value="" disabled selected>move to…</option>
+                {% for s in allowed %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+    </div>
+
+    {# Summary #}
+    {% if job.summary %}
+    <section class="card">
+        <h3>Summary</h3>
+        <p>{{ job.summary }}</p>
+    </section>
+    {% endif %}
+
+    {# Full assessment #}
+    {% if job.assessment %}
+    <section class="card">
+        <h3>Assessment</h3>
+        <div class="assessment-block">{{ job.assessment }}</div>
+    </section>
+    {% endif %}
+
+    {# Full description #}
+    {% if job.description %}
+    <section class="card">
+        <h3>Job Description</h3>
+        <details>
+            <summary></summary>
+            <div class="description-block" style="margin-top: 0.75rem;">{{ job.description }}</div>
+        </details>
+    </section>
+    {% endif %}
+
+    {# Delete #}
+    <div class="delete-form">
+        <form method="post" action="/jobs/{{ job.id }}/delete" onsubmit="return confirm('Remove this job from the list?')">
+            <button type="submit" class="delete-btn">Remove job</button>
+        </form>
+    </div>
+
+</body>
+</html>

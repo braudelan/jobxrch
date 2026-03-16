@@ -86,11 +86,12 @@ def get_jobs_with_latest_evaluation() -> list[dict]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
-            SELECT j.id, j.job_title, j.company, j.location, j.link, j.source, j.status, j.scraped_at,
-                   e.score, e.summary, e.evaluated_at
+            SELECT j.id, j.job_title, j.company, j.location, j.link, j.description,
+                   j.source, j.status, j.scraped_at,
+                   e.score, e.summary, e.assessment, e.evaluated_at
             FROM jobs j
             LEFT JOIN (
-                SELECT job_id, score, summary, evaluated_at
+                SELECT job_id, score, summary, assessment, evaluated_at
                 FROM evaluations
                 WHERE id IN (SELECT MAX(id) FROM evaluations GROUP BY job_id)
             ) e ON j.id = e.job_id
@@ -98,6 +99,47 @@ def get_jobs_with_latest_evaluation() -> list[dict]:
             ORDER BY e.score DESC NULLS LAST, j.scraped_at DESC
         """).fetchall()
         return [dict(row) for row in rows]
+
+
+def update_job_status(job_id: int, status: str) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
+
+
+def get_unevaluated_jobs() -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT j.*
+            FROM jobs j
+            LEFT JOIN (
+                SELECT job_id FROM evaluations
+                WHERE id IN (SELECT MAX(id) FROM evaluations GROUP BY job_id)
+            ) e ON j.id = e.job_id
+            WHERE j.deleted = 0 AND e.job_id IS NULL
+            ORDER BY j.scraped_at DESC
+        """).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_job_with_evaluation(job_id: int) -> Optional[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("""
+            SELECT j.*, e.score, e.summary, e.assessment, e.criteria_hash, e.evaluated_at
+            FROM jobs j
+            LEFT JOIN (
+                SELECT * FROM evaluations
+                WHERE id IN (SELECT MAX(id) FROM evaluations GROUP BY job_id)
+            ) e ON j.id = e.job_id
+            WHERE j.id = ?
+        """, (job_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def delete_job(job_id: int) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE jobs SET deleted = 1 WHERE id = ?", (job_id,))
 
 
 def save_job(job: dict) -> None:
