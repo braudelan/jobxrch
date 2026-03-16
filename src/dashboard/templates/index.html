@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Evaluator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { max-width: 960px; margin: 0 auto; padding: 2rem; }
+        .score { font-weight: bold; font-size: 1.2rem; }
+        .score-high { color: #2a9d5c; }
+        .score-mid  { color: #e8a020; }
+        .score-low  { color: #c0392b; }
+        summary { cursor: pointer; }
+        .meta { color: var(--pico-muted-color); font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <h1>Job Evaluator</h1>
+
+    <form method="post" action="/jobs/evaluate">
+        <fieldset role="group">
+            <input type="url" name="url" placeholder="Paste a LinkedIn job URL..." required>
+            <button type="submit">Evaluate</button>
+        </fieldset>
+    </form>
+
+    <hr>
+
+    {% if jobs %}
+    <table>
+        <thead>
+            <tr>
+                <th>Score</th>
+                <th>Job</th>
+                <th>Company</th>
+                <th>Summary</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for job in jobs %}
+            <tr>
+                <td>
+                    {% if job.score %}
+                        {% if job.score >= 7 %}
+                            <span class="score score-high">{{ job.score }}/10</span>
+                        {% elif job.score >= 4 %}
+                            <span class="score score-mid">{{ job.score }}/10</span>
+                        {% else %}
+                            <span class="score score-low">{{ job.score }}/10</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="meta">—</span>
+                    {% endif %}
+                </td>
+                <td><a href="{{ job.link }}" target="_blank">{{ job.job_title }}</a></td>
+                <td>{{ job.company }}<br><span class="meta">{{ job.location }}</span></td>
+                <td>{{ job.summary or "Not evaluated" }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <p>No jobs yet. Paste a URL above to get started.</p>
+    {% endif %}
+</body>
+</html>

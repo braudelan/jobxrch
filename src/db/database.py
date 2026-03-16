@@ -2,6 +2,7 @@
 import sqlite3
 import os
 from datetime import datetime, timezone
+from typing import Optional
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "jobs.db")
 
@@ -30,10 +31,24 @@ def init_db() -> None:
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
                 job_id           INTEGER NOT NULL REFERENCES jobs(id),
                 criteria_hash    TEXT NOT NULL,
+                score            INTEGER NOT NULL DEFAULT 0,
+                summary          TEXT NOT NULL DEFAULT '',
                 assessment       TEXT NOT NULL,
                 evaluated_at     TEXT NOT NULL
             )
         """)
+        # Migrations for evaluations table
+        eval_cols = {row[1] for row in conn.execute("PRAGMA table_info(evaluations)")}
+        if "score" not in eval_cols:
+            conn.execute("ALTER TABLE evaluations ADD COLUMN score INTEGER NOT NULL DEFAULT 0")
+        if "summary" not in eval_cols:
+            conn.execute("ALTER TABLE evaluations ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
+        # Migrations for jobs table
+        job_cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
+        if "status" not in job_cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'saved'")
+        if "deleted" not in job_cols:
+            conn.execute("ALTER TABLE jobs ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")
         # Migration: add source column to existing DBs that predate it
         existing = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
         if "source" not in existing:
@@ -46,18 +61,43 @@ def is_job_saved(link: str) -> bool:
         return row is not None
 
 
-def get_job_id(link: str) -> int | None:
+def get_job_id(link: str) -> Optional[int]:
     with _connect() as conn:
         row = conn.execute("SELECT id FROM jobs WHERE link = ?", (link,)).fetchone()
         return row[0] if row else None
 
 
-def save_evaluation(job_id: int, criteria_hash: str, assessment: str) -> None:
+def save_evaluation(job_id: int, criteria_hash: str, result) -> None:
     with _connect() as conn:
         conn.execute("""
-            INSERT INTO evaluations (job_id, criteria_hash, assessment, evaluated_at)
-            VALUES (?, ?, ?, ?)
-        """, (job_id, criteria_hash, assessment, datetime.now(timezone.utc).isoformat()))
+            INSERT INTO evaluations (job_id, criteria_hash, score, summary, assessment, evaluated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (job_id, criteria_hash, result.score, result.summary, result.assessment, datetime.now(timezone.utc).isoformat()))
+
+
+def get_job_by_link(link: str) -> Optional[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM jobs WHERE link = ?", (link,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_jobs_with_latest_evaluation() -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT j.id, j.job_title, j.company, j.location, j.link, j.source, j.status, j.scraped_at,
+                   e.score, e.summary, e.evaluated_at
+            FROM jobs j
+            LEFT JOIN (
+                SELECT job_id, score, summary, evaluated_at
+                FROM evaluations
+                WHERE id IN (SELECT MAX(id) FROM evaluations GROUP BY job_id)
+            ) e ON j.id = e.job_id
+            WHERE j.deleted = 0
+            ORDER BY e.score DESC NULLS LAST, j.scraped_at DESC
+        """).fetchall()
+        return [dict(row) for row in rows]
 
 
 def save_job(job: dict) -> None:
