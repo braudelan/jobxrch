@@ -1,8 +1,8 @@
-# Job Evaluator — Blueprint
+# jobXrch — A job search helper: Design Blueprint
 
 ## What is it?
 
-A local job evaluation dashboard — a personal tool that scrapes job postings, scores them via LLM, and helps track and prioritize applications.
+A local job evaluation and tracking dashboard — a personal tool that scrapes job postings, scores them via LLM, and helps track and prioritize applications.
 
 ---
 
@@ -173,7 +173,7 @@ Status flows linearly: `saved → applied → in-process → offer | rejected`
 ## Project Structure
 
 ```
-job-scraper/
+jobxrch/
 ├── main.py                  # CLI entry point (click) — pipeline + dashboard commands
 ├── criteria.txt             # User-maintained evaluation criteria
 ├── data/
