@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile — jobXrch</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { max-width: 720px; margin: 0 auto; padding: 1.5rem; font-size: 0.85rem; }
+
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .top-bar h2 { margin: 0; font-size: 1.1rem; }
+        .top-bar nav { display: flex; gap: 1rem; font-size: 0.78rem; }
+        .top-bar nav a { color: var(--pico-muted-color); text-decoration: none; }
+        .top-bar nav a:hover { color: var(--pico-primary); }
+
+        label { font-size: 0.8rem; color: var(--pico-muted-color); display: block; margin-bottom: 0.4rem; }
+        textarea { font-size: 0.83rem; line-height: 1.6; min-height: 260px; }
+        .meta { font-size: 0.75rem; color: var(--pico-muted-color); margin-top: 0.5rem; }
+        .save-row { display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; }
+        .save-row button { margin: 0; padding: 0.4rem 1.25rem; font-size: 0.83rem; }
+
+        .hint {
+            font-size: 0.78rem;
+            color: var(--pico-muted-color);
+            border-left: 3px solid var(--pico-muted-border-color);
+            padding-left: 0.75rem;
+            margin-top: 1.5rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>Profile</h2>
+        <nav>
+            <a href="/">list</a>
+            <a href="/chat">chat</a>
+        </nav>
+    </div>
+
+    <form method="post" action="/profile">
+        <label>Your career profile — used by the evaluator to score and assess every job.</label>
+        <textarea name="content" rows="12">{{ content }}</textarea>
+        {% if updated_at %}
+        <p class="meta">Last updated {{ updated_at[:16].replace('T', ' ') }} UTC</p>
+        {% endif %}
+        <div class="save-row">
+            <button type="submit">Save</button>
+        </div>
+    </form>
+
+    <div class="hint">
+        <strong>Tip:</strong> You can edit this directly, or go to <a href="/chat">Chat</a> and click
+        <em>Save insights to profile</em> to automatically distill signals from your conversation into this profile.
+    </div>
+</body>
+</html>

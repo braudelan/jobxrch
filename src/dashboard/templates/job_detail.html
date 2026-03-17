@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ job.job_title }} — Job Evaluator</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body { max-width: 860px; margin: 0 auto; padding: 1.5rem; font-size: 0.85rem; }
 
@@ -47,7 +48,10 @@
         section.card { border: 1px solid var(--pico-muted-border-color); border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
         section.card h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pico-muted-color); margin-bottom: 0.5rem; }
 
-        .assessment-block { white-space: pre-wrap; font-size: 0.82rem; line-height: 1.5; }
+        .assessment-block { font-size: 0.82rem; line-height: 1.5; }
+        .assessment-block h1, .assessment-block h2, .assessment-block h3 { font-size: 0.9rem; margin-top: 0.75rem; margin-bottom: 0.25rem; }
+        .assessment-block ul, .assessment-block ol { padding-left: 1.25rem; margin: 0.25rem 0; }
+        .assessment-block p { margin: 0.4rem 0; }
         .description-block { white-space: pre-wrap; font-size: 0.8rem; line-height: 1.5; max-height: 500px; overflow-y: auto; }
 
         details summary { cursor: pointer; font-size: 0.8rem; color: var(--pico-muted-color); list-style: none; }
@@ -60,7 +64,11 @@
     </style>
 </head>
 <body>
-    <a class="back" href="/">← Back to list</a>
+    <nav style="display:flex; gap:1rem; font-size:0.8rem; margin-bottom:0.5rem;">
+        <a href="/">← list</a>
+        <a href="/chat">chat</a>
+        <a href="/profile">profile</a>
+    </nav>
 
     <div class="title-row">
         <h2>{{ job.job_title }}</h2>
@@ -122,7 +130,11 @@
     {% if job.assessment %}
     <section class="card">
         <h3>Assessment</h3>
-        <div class="assessment-block">{{ job.assessment }}</div>
+        <div class="assessment-block" id="assessment-block"></div>
+        <script>
+            document.getElementById('assessment-block').innerHTML =
+                marked.parse({{ job.assessment | tojson }});
+        </script>
     </section>
     {% endif %}
 

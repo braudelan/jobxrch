@@ -1,16 +1,19 @@
 # src/dashboard/app.py
 import os
 from fastapi import FastAPI, HTTPException, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from playwright.sync_api import sync_playwright
+from pydantic import BaseModel
 from src.db.database import (
     init_db, is_job_saved, save_job, get_job_by_link,
     get_job_id, save_evaluation, get_jobs_with_latest_evaluation,
     update_job_status, get_job_with_evaluation, delete_job,
+    get_profile, save_profile, get_profile_updated_at,
+    save_message, get_messages,
 )
 from src.fetcher.fetcher import fetch_job_description
-from src.evaluator.evaluator import evaluate_job
+from src.evaluator.evaluator import evaluate_job, chat_reply, distill_profile
 
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".session")
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
@@ -85,3 +88,74 @@ def job_detail(request: Request, job_id: int):
 def delete(job_id: int):
     delete_job(job_id)
     return RedirectResponse("/", status_code=303)
+
+
+# --- Chat ---
+
+class ChatRequest(BaseModel):
+    messages: list[dict]
+
+
+@app.get("/chat", response_class=HTMLResponse)
+def chat_page(request: Request):
+    messages = get_messages()
+    return templates.TemplateResponse("chat.html", {
+        "request": request,
+        "messages": messages,
+    })
+
+
+@app.post("/chat/message")
+def chat_message(body: ChatRequest):
+    messages = body.messages
+    if not messages:
+        raise HTTPException(status_code=400, detail="No messages provided")
+
+    # Save user message (last in the list)
+    last = messages[-1]
+    if last["role"] == "user":
+        save_message("user", last["content"])
+
+    # Build DB context snapshot
+    jobs = get_jobs_with_latest_evaluation()
+    if jobs:
+        lines = ["| Title | Company | Score | Status |", "| --- | --- | --- | --- |"]
+        for j in jobs:
+            score = str(j["score"]) if j.get("score") else "—"
+            lines.append(f"| {j['job_title']} | {j['company']} | {score} | {j['status']} |")
+        db_context = "\n".join(lines)
+    else:
+        db_context = "No jobs saved yet."
+
+    reply = chat_reply(messages, db_context)
+    save_message("assistant", reply)
+    return JSONResponse({"reply": reply})
+
+
+@app.post("/chat/distill")
+def chat_distill():
+    messages = get_messages()
+    existing = get_profile()
+    msg_dicts = [{"role": m["role"], "content": m["content"]} for m in messages]
+    updated = distill_profile(existing, msg_dicts)
+    save_profile(updated)
+    return JSONResponse({"profile": updated})
+
+
+# --- Profile ---
+
+@app.get("/profile", response_class=HTMLResponse)
+def profile_page(request: Request):
+    content = get_profile()
+    updated_at = get_profile_updated_at()
+    return templates.TemplateResponse("profile.html", {
+        "request": request,
+        "content": content,
+        "updated_at": updated_at,
+    })
+
+
+@app.post("/profile")
+def profile_save(content: str = Form(...)):
+    save_profile(content)
+    return RedirectResponse("/profile", status_code=303)

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "jobs.db")
+CRITERIA_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "criteria.txt")
 
 
 def _connect() -> sqlite3.Connection:
@@ -53,6 +54,30 @@ def init_db() -> None:
         existing = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
         if "source" not in existing:
             conn.execute("ALTER TABLE jobs ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                role       TEXT NOT NULL,
+                content    TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_profile (
+                id         INTEGER PRIMARY KEY,
+                content    TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL
+            )
+        """)
+        # Seed profile from criteria.txt on first startup
+        row = conn.execute("SELECT id FROM user_profile WHERE id = 1").fetchone()
+        if row is None and os.path.exists(CRITERIA_PATH):
+            with open(CRITERIA_PATH) as f:
+                seed = f.read().strip()
+            conn.execute(
+                "INSERT INTO user_profile (id, content, updated_at) VALUES (1, ?, ?)",
+                (seed, datetime.now(timezone.utc).isoformat()),
+            )
 
 
 def is_job_saved(link: str) -> bool:
@@ -148,3 +173,49 @@ def save_job(job: dict) -> None:
             INSERT INTO jobs (job_title, company, location, link, description, source, scraped_at)
             VALUES (:job_title, :company, :location, :link, :description, :source, :scraped_at)
         """, {**job, "scraped_at": datetime.now(timezone.utc).isoformat()})
+
+
+def get_profile() -> str:
+    with _connect() as conn:
+        row = conn.execute("SELECT content FROM user_profile WHERE id = 1").fetchone()
+        return row[0] if row else ""
+
+
+def save_profile(content: str) -> None:
+    with _connect() as conn:
+        conn.execute("""
+            INSERT INTO user_profile (id, content, updated_at) VALUES (1, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at
+        """, (content, datetime.now(timezone.utc).isoformat()))
+
+
+def get_profile_updated_at() -> Optional[str]:
+    with _connect() as conn:
+        row = conn.execute("SELECT updated_at FROM user_profile WHERE id = 1").fetchone()
+        return row[0] if row else None
+
+
+def save_message(role: str, content: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO chat_messages (role, content, created_at) VALUES (?, ?, ?)",
+            (role, content, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def get_messages(limit: int = 200) -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM chat_messages ORDER BY created_at ASC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_messages_since(since_id: int) -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM chat_messages WHERE id > ? ORDER BY created_at ASC", (since_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]

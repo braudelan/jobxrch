@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat — jobXrch</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; font-size: 1rem; }
+        body { display: flex; flex-direction: column; max-width: 1100px; margin: 0 auto; padding: 4rem 1rem 0; }
+
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0.75rem 0 0.5rem;
+            margin-bottom: 2.5rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+            flex-shrink: 0;
+        }
+        .top-bar h2 { margin: 0; font-size: 1rem; font-weight: 700; }
+        .top-bar nav { display: flex; gap: 1rem; font-size: 0.95rem; }
+        .top-bar nav a { color: var(--pico-muted-color); text-decoration: none; }
+        .top-bar nav a:hover { color: var(--pico-primary); }
+
+        .messages {
+            overflow-y: auto;
+            max-height: 65vh;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 10px;
+            background: #f0f4f8;
+        }
+
+        .msg { display: flex; gap: 0.5rem; max-width: 100%; }
+        .msg.user { flex-direction: row-reverse; }
+
+        .bubble {
+            padding: 0.5rem 0.85rem;
+            border-radius: 12px;
+            max-width: 75%;
+            line-height: 1.5;
+            font-size: 1.1rem;
+        }
+        .msg.user .bubble {
+            background: var(--pico-primary);
+            color: #fff;
+            border-bottom-right-radius: 3px;
+        }
+        .msg.assistant .bubble {
+            background: var(--pico-card-background-color);
+            border: 1px solid var(--pico-muted-border-color);
+            border-bottom-left-radius: 3px;
+        }
+        .msg.assistant .bubble h1,
+        .msg.assistant .bubble h2,
+        .msg.assistant .bubble h3 { font-size: 0.88rem; margin: 0.5rem 0 0.2rem; }
+        .msg.assistant .bubble ul,
+        .msg.assistant .bubble ol { padding-left: 1.2rem; margin: 0.2rem 0; }
+        .msg.assistant .bubble p { margin: 0.3rem 0; }
+
+        .bottom-bar {
+            flex-shrink: 0;
+            padding: 0.75rem 0;
+            margin-top: 2.5rem;
+            border-top: 1px solid var(--pico-muted-border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .input-row { display: flex; gap: 0.5rem; }
+        .input-row textarea {
+            flex: 1;
+            resize: none;
+            height: 2.4rem;
+            font-size: 1rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: 8px;
+            margin: 0;
+            field-sizing: content;
+            max-height: 8rem;
+        }
+        .input-row button {
+            padding: 0.4rem 1rem;
+            font-size: 1rem;
+            margin: 0;
+            align-self: flex-end;
+        }
+        .action-row { display: flex; justify-content: flex-end; gap: 0.5rem; align-items: center; }
+        .distill-btn {
+            background: none;
+            border: 1px solid var(--pico-muted-border-color);
+            color: var(--pico-muted-color);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .distill-btn:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+        .distill-msg { font-size: 0.75rem; color: var(--pico-muted-color); }
+
+        .typing { font-size: 0.78rem; color: var(--pico-muted-color); padding: 0 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>Chat</h2>
+        <nav>
+            <a href="/">list</a>
+            <a href="/profile">profile</a>
+        </nav>
+    </div>
+
+    <div class="messages" id="messages">
+        {% for m in messages %}
+        <div class="msg {{ m.role }}">
+            <div class="bubble" {% if m.role == 'assistant' %}data-markdown="{{ m.content | e }}"{% endif %}>
+                {% if m.role == 'assistant' %}{% else %}{{ m.content }}{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% if not messages %}
+        <p style="color: var(--pico-muted-color); font-size: 0.8rem; text-align: center; margin-top: 2rem;">
+            Ask me about your job search, discuss a specific role, or tell me more about what you're looking for.
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="bottom-bar">
+        <div class="input-row">
+            <textarea id="input" placeholder="Message…" rows="1"></textarea>
+            <button id="send-btn">Send</button>
+        </div>
+        <div class="action-row">
+            <span class="distill-msg" id="distill-msg"></span>
+            <button class="distill-btn" id="distill-btn">Save insights to profile</button>
+        </div>
+    </div>
+
+    <script>
+    // Render existing assistant markdown bubbles
+    document.querySelectorAll('.bubble[data-markdown]').forEach(el => {
+        el.innerHTML = marked.parse(el.dataset.markdown);
+    });
+
+    const messagesEl = document.getElementById('messages');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send-btn');
+    const distillBtn = document.getElementById('distill-btn');
+    const distillMsg = document.getElementById('distill-msg');
+
+    // In-memory conversation history (loaded from rendered messages)
+    const history = [];
+    document.querySelectorAll('#messages .msg').forEach(el => {
+        const role = el.classList.contains('user') ? 'user' : 'assistant';
+        const bubble = el.querySelector('.bubble');
+        const content = bubble.dataset.markdown ?? bubble.textContent.trim();
+        if (content) history.push({ role, content });
+    });
+
+    function scrollBottom() {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+    scrollBottom();
+
+    function appendMsg(role, content) {
+        // Remove empty-state placeholder if present
+        const placeholder = messagesEl.querySelector('p');
+        if (placeholder) placeholder.remove();
+
+        const div = document.createElement('div');
+        div.className = `msg ${role}`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        if (role === 'assistant') {
+            bubble.innerHTML = marked.parse(content);
+        } else {
+            bubble.textContent = content;
+        }
+        div.appendChild(bubble);
+        messagesEl.appendChild(div);
+        scrollBottom();
+    }
+
+    async function sendMessage() {
+        const text = inputEl.value.trim();
+        if (!text) return;
+        inputEl.value = '';
+        inputEl.style.height = '';
+
+        appendMsg('user', text);
+        history.push({ role: 'user', content: text });
+
+        // Typing indicator
+        const typing = document.createElement('div');
+        typing.className = 'typing';
+        typing.textContent = '…';
+        messagesEl.appendChild(typing);
+        scrollBottom();
+
+        sendBtn.disabled = true;
+        try {
+            const res = await fetch('/chat/message', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: history }),
+            });
+            const data = await res.json();
+            typing.remove();
+            appendMsg('assistant', data.reply);
+            history.push({ role: 'assistant', content: data.reply });
+        } catch (e) {
+            typing.remove();
+            appendMsg('assistant', 'Error — please try again.');
+        } finally {
+            sendBtn.disabled = false;
+            inputEl.focus();
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    inputEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    distillBtn.addEventListener('click', async () => {
+        distillBtn.disabled = true;
+        distillMsg.textContent = 'Saving…';
+        try {
+            const res = await fetch('/chat/distill', { method: 'POST' });
+            const data = await res.json();
+            distillMsg.textContent = 'Profile updated ✓';
+            setTimeout(() => { distillMsg.textContent = ''; }, 3000);
+        } catch (e) {
+            distillMsg.textContent = 'Failed — try again.';
+        } finally {
+            distillBtn.disabled = false;
+        }
+    });
+    </script>
+</body>
+</html>
