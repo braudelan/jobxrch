@@ -1,4 +1,4 @@
-# src/evaluator/providers/gemini.py
+# src/llm_utils/providers/gemini.py
 import os
 from google import genai
 

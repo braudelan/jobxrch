@@ -20,7 +20,7 @@ def pipeline():
 def evaluate_all(force):
     """Evaluate all unevaluated jobs (or all jobs with --force)."""
     from src.db.database import init_db, get_unevaluated_jobs, get_jobs_with_latest_evaluation, save_evaluation
-    from src.evaluator.evaluator import evaluate_job
+    from src.llm_utils.evaluate import evaluate_job
 
     init_db()
 

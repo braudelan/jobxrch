@@ -1,4 +1,4 @@
-# src/evaluator/providers/anthropic.py
+# src/llm_utils/providers/anthropic.py
 import os
 import anthropic
 
@@ -15,7 +15,7 @@ def _get_client():
 def complete(prompt: str) -> str:
     message = _get_client().messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1024,
+        max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
     return message.content[0].text

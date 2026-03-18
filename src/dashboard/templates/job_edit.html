@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Job — Job Evaluator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { max-width: 600px; margin: 0 auto; padding: 1.5rem; font-size: 0.85rem; }
+        h2 { margin-bottom: 0.25rem; }
+        .note { color: var(--pico-muted-color); font-size: 0.8rem; margin-bottom: 1.5rem; }
+    </style>
+</head>
+<body>
+    <nav style="display:flex; gap:1rem; font-size:0.8rem; margin-bottom:0.5rem;">
+        <a href="/">← list</a>
+        <a href="/jobs/{{ job.id }}">← job detail</a>
+    </nav>
+
+    <h2>Edit Job Details</h2>
+    <p class="note">We couldn't extract all metadata automatically. Please fill in the missing fields before evaluating.</p>
+
+    <form method="post" action="/jobs/{{ job.id }}/edit">
+        <label>
+            Job Title
+            <input type="text" name="job_title" value="{{ job.job_title }}" required>
+        </label>
+        <label>
+            Company
+            <input type="text" name="company" value="{{ job.company }}">
+        </label>
+        <label>
+            Location
+            <input type="text" name="location" value="{{ job.location }}">
+        </label>
+        <button type="submit">Save & go to job</button>
+    </form>
+</body>
+</html>

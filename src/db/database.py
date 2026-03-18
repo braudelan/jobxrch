@@ -162,6 +162,14 @@ def get_job_with_evaluation(job_id: int) -> Optional[dict]:
         return dict(row) if row else None
 
 
+def update_job_metadata(job_id: int, job_title: str, company: str, location: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE jobs SET job_title = ?, company = ?, location = ? WHERE id = ?",
+            (job_title, company, location, job_id),
+        )
+
+
 def delete_job(job_id: int) -> None:
     with _connect() as conn:
         conn.execute("UPDATE jobs SET deleted = 1 WHERE id = ?", (job_id,))

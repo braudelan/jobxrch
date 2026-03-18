@@ -4,7 +4,7 @@ from playwright.sync_api import sync_playwright
 from src.scraper.crawler import scrape_all_saved_jobs
 from src.fetcher.fetcher import fetch_job_description
 from src.db.database import init_db, is_job_saved, save_job, get_job_id, save_evaluation
-from src.evaluator.evaluator import evaluate_job
+from src.llm_utils.evaluate import evaluate_job
 
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "..", ".session")
 

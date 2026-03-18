@@ -9,11 +9,14 @@ from src.db.database import (
     init_db, is_job_saved, save_job, get_job_by_link,
     get_job_id, save_evaluation, get_jobs_with_latest_evaluation,
     update_job_status, get_job_with_evaluation, delete_job,
+    update_job_metadata,
     get_profile, save_profile, get_profile_updated_at,
     save_message, get_messages,
 )
-from src.fetcher.fetcher import fetch_job_description
-from src.evaluator.evaluator import evaluate_job, chat_reply, distill_profile
+from src.fetcher.fetcher import fetch_job_description, fetch_job_details
+from src.llm_utils.evaluate import evaluate_job
+from src.llm_utils.chat import chat_reply
+from src.llm_utils.profile import distill_profile
 
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".session")
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
@@ -48,22 +51,40 @@ def evaluate(url: str = Form(...)):
             headless=False,
         )
         if not is_job_saved(url):
-            description = fetch_job_description(context, url)
+            details = fetch_job_details(context, url)
             save_job({
-                "job_title": "Unknown",
-                "company": "Unknown",
-                "location": "Unknown",
+                "job_title": details["job_title"],
+                "company": details["company"],
+                "location": details["location"],
                 "link": url,
-                "description": description,
+                "description": details["description"],
                 "source": "manual",
             })
         context.close()
 
     job = get_job_by_link(url)
-    result, chash = evaluate_job(job)
-    save_evaluation(get_job_id(url), chash, result)
+    needs_edit = not job["company"] or not job["location"] or job["job_title"] == "Unknown"
+    if needs_edit:
+        return RedirectResponse(f"/jobs/{job['id']}/edit", status_code=303)
 
-    return RedirectResponse("/", status_code=303)
+    result, chash = evaluate_job(job)
+    save_evaluation(job["id"], chash, result)
+
+    return RedirectResponse(f"/jobs/{job['id']}", status_code=303)
+
+
+@app.get("/jobs/{job_id}/edit", response_class=HTMLResponse)
+def job_edit_page(request: Request, job_id: int):
+    job = get_job_with_evaluation(job_id)
+    if not job:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse("job_edit.html", {"request": request, "job": job})
+
+
+@app.post("/jobs/{job_id}/edit")
+def job_edit_save(job_id: int, job_title: str = Form(...), company: str = Form(...), location: str = Form(...)):
+    update_job_metadata(job_id, job_title, company, location)
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
 @app.post("/jobs/{job_id}/status")
@@ -123,6 +144,12 @@ def chat_message(body: ChatRequest):
         for j in jobs:
             score = str(j["score"]) if j.get("score") else "—"
             lines.append(f"| {j['job_title']} | {j['company']} | {score} | {j['status']} |")
+        lines.append("\n## Job Details")
+        for j in jobs:
+            score = str(j["score"]) if j.get("score") else "N/A"
+            lines.append(f"\n### {j['job_title']} @ {j['company']} (score: {score}, status: {j['status']})")
+            if j.get("description"):
+                lines.append(j["description"])
         db_context = "\n".join(lines)
     else:
         db_context = "No jobs saved yet."
