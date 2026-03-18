@@ -154,7 +154,7 @@ def chat_message(body: ChatRequest):
     else:
         db_context = "No jobs saved yet."
 
-    reply = chat_reply(messages, db_context)
+    reply = chat_reply(messages, db_context, get_profile())
     save_message("assistant", reply)
     return JSONResponse({"reply": reply})
 
