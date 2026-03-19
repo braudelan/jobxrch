@@ -77,6 +77,11 @@
         th:nth-child(3) { }                /* Summary (flex) */
         th:nth-child(4) { width: 60px; }   /* Score */
         th:nth-child(5) { width: 130px; }  /* Status */
+        th:nth-child(6) { width: 80px; }   /* Actions */
+        .row-actions { display: flex; gap: 0.25rem; }
+        .btn-sm { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 4px; font-size: 0.7rem; padding: 0.15rem 0.4rem; cursor: pointer; color: var(--pico-muted-color); line-height: 1.4; }
+        .btn-sm:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+        .btn-sm.danger:hover { border-color: #c0392b; color: #c0392b; }
         th { white-space: nowrap; font-size: 0.75rem; cursor: pointer; user-select: none; }
         th:hover { color: var(--pico-primary); }
         th.sort-asc::after  { content: " ▲"; font-size: 0.65rem; }
@@ -109,10 +114,7 @@
         <aside class="sidebar">
             <section>
                 <h3>Ingest</h3>
-                <form method="post" action="/jobs/evaluate">
-                    <input type="url" name="url" placeholder="Paste a LinkedIn URL…" required style="margin-bottom: 0.4rem;">
-                    <button type="submit" style="width: 100%;">Evaluate</button>
-                </form>
+                <a href="/ingest" role="button" style="display: block; width: 100%; text-align: center; font-size: 0.8rem;">+ Add job</a>
             </section>
             <section>
                 <h3>Tools</h3>
@@ -142,6 +144,7 @@
                 <th>Summary</th>
                 <th>Score</th>
                 <th>Status</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -197,6 +200,16 @@
                         </select>
                     </form>
                     {% endif %}
+                </td>
+
+                {# Actions #}
+                <td>
+                    <div class="row-actions">
+                        <button type="button" class="btn-sm" title="Re-evaluate" onclick="reeval(this, {{ job.id }})">↺</button>
+                        <form method="post" action="/jobs/{{ job.id }}/delete" style="margin:0;" onsubmit="return confirm('Remove this job?')">
+                            <button type="submit" class="btn-sm danger" title="Delete">✕</button>
+                        </form>
+                    </div>
                 </td>
 
             </tr>
@@ -258,6 +271,20 @@
     });
 
     applyFilter();
+
+    async function reeval(btn, jobId) {
+        btn.disabled = true;
+        btn.textContent = '…';
+        try {
+            const resp = await fetch(`/jobs/${jobId}/evaluate`, {method: 'POST'});
+            if (!resp.ok) throw new Error(resp.statusText);
+            btn.textContent = '✓';
+            setTimeout(() => { btn.textContent = '↺'; btn.disabled = false; }, 2000);
+        } catch {
+            btn.textContent = '!';
+            btn.disabled = false;
+        }
+    }
     </script>
 </body>
 </html>

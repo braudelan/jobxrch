@@ -61,6 +61,8 @@
         .delete-form { margin-top: 2rem; }
         .delete-btn { background: none; border: 1px solid #c0392b; color: #c0392b; font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer; }
         .delete-btn:hover { background: #fee2e2; }
+        .reeval-btn { background: none; border: 1px solid var(--pico-muted-border-color); color: var(--pico-muted-color); font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer; }
+        .reeval-btn:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
     </style>
 </head>
 <body>
@@ -86,7 +88,7 @@
 
     {# Score + evaluated_at #}
     {% if job.score %}
-    <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
         {% if job.score >= 7 %}
             <span class="score-badge score-high">{{ job.score }}/10</span>
         {% elif job.score >= 4 %}
@@ -97,9 +99,13 @@
         {% if job.evaluated_at %}
         <span class="eval-meta">evaluated {{ job.evaluated_at[:10] }}</span>
         {% endif %}
+        <button type="button" class="reeval-btn" id="reeval-btn" onclick="reeval({{ job.id }})">↺ Re-evaluate</button>
     </div>
     {% else %}
-    <p class="eval-meta">Not yet evaluated.</p>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <p class="eval-meta" style="margin:0;">Not yet evaluated.</p>
+        <button type="button" class="reeval-btn" id="reeval-btn" onclick="reeval({{ job.id }})">↺ Evaluate</button>
+    </div>
     {% endif %}
 
     {# Status row #}
@@ -155,6 +161,22 @@
             <button type="submit" class="delete-btn">Remove job</button>
         </form>
     </div>
+
+    <script>
+    async function reeval(jobId) {
+        const btn = document.getElementById('reeval-btn');
+        btn.disabled = true;
+        btn.textContent = 'Evaluating…';
+        try {
+            const resp = await fetch(`/jobs/${jobId}/evaluate`, {method: 'POST'});
+            if (!resp.ok) throw new Error(resp.statusText);
+            btn.textContent = '✓ Done — reload to see updated score';
+        } catch {
+            btn.textContent = 'Error — try again';
+            btn.disabled = false;
+        }
+    }
+    </script>
 
 </body>
 </html>

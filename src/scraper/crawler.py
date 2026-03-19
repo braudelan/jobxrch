@@ -1,4 +1,10 @@
 # src/scraper/crawler.py
+"""
+Crawls LinkedIn's saved jobs pages using a Playwright browser session,
+paginating through all results and returning a list of job dicts with
+keys: job_title, company, location, link, source.
+"""
+
 import time
 import random
 from playwright.sync_api import Page

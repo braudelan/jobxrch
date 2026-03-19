@@ -30,43 +30,61 @@ def _extract_text(page, selector: str, fallback: str = "") -> str:
         return fallback
 
 
-def fetch_job_details(context: BrowserContext, url: str) -> dict:
+def _open_page(context: BrowserContext, url: str) -> Page:
     page = context.new_page()
-    try:
-        page.goto(url, timeout=15000)
-        page.wait_for_selector("h2:has-text('About the job')", timeout=10000)
-        _expand_job_description(page)
+    page.goto(url, timeout=15000)
+    page.wait_for_selector("h2:has-text('About the job')", timeout=10000)
+    _expand_job_description(page)
+    return page
 
-        title = _extract_text(page, "h1.top-card-layout__title") or _extract_text(page, "h1")
-        company = _extract_text(page, "a.topcard__org-name-link") or _extract_text(page, ".topcard__org-name-link")
-        location = _extract_text(page, ".topcard__flavor--bullet")
-        description = _extract_job_description(page)
 
-        return {
-            "job_title": title or "Unknown",
-            "company": company or "",
-            "location": location or "",
-            "description": description,
-        }
-    except Exception as e:
-        print(f"Failed to fetch job details for {url}: {e}")
-        return {"job_title": "Unknown", "company": "", "location": "", "description": ""}
-    finally:
-        page.close()
+def _extract_metadata_selectors(page: Page) -> dict:
+    title = _extract_text(page, "h1.top-card-layout__title") or _extract_text(page, "h1")
+    company = _extract_text(page, "a.topcard__org-name-link") or _extract_text(page, ".topcard__org-name-link")
+    location = _extract_text(page, ".topcard__flavor--bullet")
+    return {
+        "job_title": title or "",
+        "company": company or "",
+        "location": location or "",
+    }
 
 
 def fetch_job_description(context: BrowserContext, url: str) -> str:
-    page = context.new_page()
+    page = _open_page(context, url)
     try:
-        page.goto(url, timeout=15000)
-        page.wait_for_selector("h2:has-text('About the job')", timeout=10000)
         print(f"\nPage loaded for {url}")
-        print("Expanding description if needed...")
-        _expand_job_description(page)
-        print("JD expanded (if applicable). Extracting text...")
+        print("Extracting description...")
         return _extract_job_description(page)
     except Exception as e:
         print(f"Failed to fetch JD for {url}: {e}")
         return ""
+    finally:
+        page.close()
+
+
+def fetch_job_details(context: BrowserContext, url: str) -> dict:
+    page = _open_page(context, url)
+    try:
+        description = _extract_job_description(page)
+        metadata = _extract_metadata_selectors(page)
+
+        if not metadata["job_title"] or not metadata["company"]:
+            from src.llm_utils.evaluate import extract_metadata_from_text
+            llm_meta = extract_metadata_from_text(description)
+            if not metadata["job_title"]:
+                metadata["job_title"] = llm_meta.get("job_title", "Unknown")
+            if not metadata["company"]:
+                metadata["company"] = llm_meta.get("company", "")
+            if not metadata["location"]:
+                metadata["location"] = llm_meta.get("location", "")
+
+        if not metadata["job_title"]:
+            metadata["job_title"] = "Unknown"
+
+        metadata["description"] = description
+        return metadata
+    except Exception as e:
+        print(f"Failed to fetch job details for {url}: {e}")
+        return {"job_title": "Unknown", "company": "", "location": "", "description": ""}
     finally:
         page.close()

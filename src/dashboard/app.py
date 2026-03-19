@@ -1,5 +1,7 @@
 # src/dashboard/app.py
 import os
+import uuid
+import threading
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -27,6 +29,8 @@ STATUS_FLOW = {s: [t for t in ALL_STATUSES if t != s] for s in ALL_STATUSES}
 app = FastAPI()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+ingest_tasks: dict[str, dict] = {}
+
 
 @app.on_event("startup")
 def startup():
@@ -43,34 +47,65 @@ def index(request: Request):
     })
 
 
-@app.post("/jobs/evaluate")
-def evaluate(url: str = Form(...)):
-    with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(
-            user_data_dir=SESSION_DIR,
-            headless=False,
-        )
-        if not is_job_saved(url):
-            details = fetch_job_details(context, url)
-            save_job({
-                "job_title": details["job_title"],
-                "company": details["company"],
-                "location": details["location"],
-                "link": url,
-                "description": details["description"],
-                "source": "manual",
-            })
-        context.close()
+@app.get("/ingest", response_class=HTMLResponse)
+def ingest_page(request: Request) -> HTMLResponse:
+    """Page to submit a new job posting URL for ingestion."""
+    return templates.TemplateResponse("ingest.html", {"request": request})
 
-    job = get_job_by_link(url)
-    needs_edit = not job["company"] or not job["location"] or job["job_title"] == "Unknown"
-    if needs_edit:
-        return RedirectResponse(f"/jobs/{job['id']}/edit", status_code=303)
 
+def _run_ingest(task_id: str, url: str) -> None:
+    """Background task to ingest a job posting from a URL."""
+    try:
+        with sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(
+                user_data_dir=SESSION_DIR,
+                headless=False,
+            )
+            if not is_job_saved(url):
+                details = fetch_job_details(context, url)
+                save_job({
+                    "job_title": details["job_title"],
+                    "company": details["company"],
+                    "location": details["location"],
+                    "link": url,
+                    "description": details["description"],
+                    "source": "manual",
+                })
+            context.close()
+
+        job = get_job_by_link(url)
+        result, chash = evaluate_job(job)
+        save_evaluation(job["id"], chash, result)
+        ingest_tasks[task_id] = {"status": "done", "job_id": job["id"]}
+    except BaseException as e:
+        ingest_tasks[task_id] = {"status": "error", "message": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/ingest")
+def ingest_submit(url: str = Form(...)) -> JSONResponse:
+    """Start background thread to ingest job posting from the provided URL."""
+    task_id = str(uuid.uuid4())
+    ingest_tasks[task_id] = {"status": "pending"}
+    threading.Thread(target=_run_ingest, args=(task_id, url), daemon=True).start()
+    return JSONResponse({"task_id": task_id})
+
+
+@app.get("/ingest/status/{task_id}")
+def ingest_status(task_id: str):
+    task = ingest_tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return JSONResponse(task)
+
+
+@app.post("/jobs/{job_id}/evaluate")
+def reevaluate(job_id: int):
+    job = get_job_with_evaluation(job_id)
+    if not job:
+        raise HTTPException(status_code=404)
     result, chash = evaluate_job(job)
-    save_evaluation(job["id"], chash, result)
-
-    return RedirectResponse(f"/jobs/{job['id']}", status_code=303)
+    save_evaluation(job_id, chash, result)
+    return JSONResponse({"score": result.score, "summary": result.summary})
 
 
 @app.get("/jobs/{job_id}/edit", response_class=HTMLResponse)

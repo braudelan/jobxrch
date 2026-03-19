@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Job — jobXrch</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { max-width: 540px; margin: 0 auto; padding: 2rem 1rem; font-size: 0.85rem; }
+        .back { font-size: 0.8rem; color: var(--pico-muted-color); text-decoration: none; display: inline-block; margin-bottom: 1.5rem; }
+        .back:hover { color: var(--pico-primary); }
+        h2 { margin-bottom: 0.25rem; }
+        .subtitle { color: var(--pico-muted-color); font-size: 0.8rem; margin-bottom: 1.5rem; }
+        #status-area { margin-top: 1.25rem; display: none; }
+        .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid var(--pico-muted-border-color); border-top-color: var(--pico-primary); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: middle; margin-right: 0.4rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status-msg { color: var(--pico-muted-color); font-size: 0.82rem; }
+        .error-msg { color: #c0392b; font-size: 0.82rem; }
+        #retry-btn { margin-top: 0.75rem; }
+    </style>
+</head>
+<body>
+    <a class="back" href="/">← back to list</a>
+    <h2>Add a job</h2>
+    <p class="subtitle">Paste a LinkedIn job URL to fetch, save, and evaluate it.</p>
+
+    <form id="ingest-form">
+        <input type="url" id="url-input" name="url" placeholder="https://www.linkedin.com/jobs/view/…" required style="margin-bottom: 0.75rem;">
+        <button type="submit" id="submit-btn" style="width: 100%;">Fetch &amp; Evaluate</button>
+    </form>
+
+    <div id="status-area">
+        <div id="progress-row">
+            <span class="spinner" id="spinner"></span>
+            <span class="status-msg" id="status-msg">Fetching and evaluating…</span>
+        </div>
+        <div id="error-row" style="display:none;">
+            <p class="error-msg" id="error-msg"></p>
+            <button id="retry-btn" onclick="reset()">Try again</button>
+        </div>
+    </div>
+
+    <script>
+    let pollInterval = null;
+
+    function reset() {
+        document.getElementById('ingest-form').style.display = '';
+        document.getElementById('status-area').style.display = 'none';
+        document.getElementById('error-row').style.display = 'none';
+        document.getElementById('progress-row').style.display = '';
+        document.getElementById('submit-btn').disabled = false;
+        document.getElementById('url-input').value = '';
+        if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    }
+
+    document.getElementById('ingest-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const url = document.getElementById('url-input').value.trim();
+        if (!url) return;
+
+        document.getElementById('submit-btn').disabled = true;
+        document.getElementById('ingest-form').style.display = 'none';
+        document.getElementById('status-area').style.display = '';
+        document.getElementById('status-msg').textContent = 'Fetching and evaluating…';
+
+        let taskId;
+        try {
+            const resp = await fetch('/ingest', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'url=' + encodeURIComponent(url),
+            });
+            const data = await resp.json();
+            taskId = data.task_id;
+        } catch (err) {
+            showError('Failed to start ingestion: ' + err.message);
+            return;
+        }
+
+        const startTime = Date.now();
+        const TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes
+
+        pollInterval = setInterval(async () => {
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            document.getElementById('status-msg').textContent = `Fetching and evaluating… (${elapsed}s)`;
+
+            if (Date.now() - startTime > TIMEOUT_MS) {
+                clearInterval(pollInterval);
+                showError('Timed out after 3 minutes. The browser or LLM may have hung.');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/ingest/status/' + taskId);
+                const data = await resp.json();
+                if (data.status === 'done') {
+                    clearInterval(pollInterval);
+                    window.location.href = '/jobs/' + data.job_id;
+                } else if (data.status === 'error') {
+                    clearInterval(pollInterval);
+                    showError(data.message || 'An error occurred.');
+                }
+            } catch (err) {
+                clearInterval(pollInterval);
+                showError('Lost connection while polling.');
+            }
+        }, 2000);
+    });
+
+    function showError(msg) {
+        document.getElementById('spinner').style.display = 'none';
+        document.getElementById('status-msg').style.display = 'none';
+        document.getElementById('error-msg').textContent = msg;
+        document.getElementById('error-row').style.display = '';
+    }
+    </script>
+</body>
+</html>
