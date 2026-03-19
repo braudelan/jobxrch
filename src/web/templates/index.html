@@ -89,7 +89,7 @@
         td { vertical-align: top; padding-top: 0.4rem; padding-bottom: 0.4rem; }
 
         /* Header */
-        .site-header { text-align: left; padding: 1.5rem 0 1rem; }
+        .site-header { display: flex; align-items: center; justify-content: space-between; padding: 1.5rem 0 1rem; }
         .site-header h1 {
             font-size: 2.5rem;
             font-weight: 750;
@@ -98,13 +98,43 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin: 0.5;
+            margin: 0;
         }
+
+        /* Theme toggle */
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 999px;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0.25rem 0.6rem;
+            color: var(--pico-muted-color);
+            line-height: 1;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .theme-toggle:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+
+        /* Dark mode badge overrides */
+        [data-theme="dark"] .status-saved      { background: #2a2a2a; color: #aaa; }
+        [data-theme="dark"] .status-applied    { background: #1e3a5f; color: #93c5fd; }
+        [data-theme="dark"] .status-in-process { background: #3d2e00; color: #fcd34d; }
+        [data-theme="dark"] .status-offer      { background: #0d3321; color: #6ee7b7; }
+        [data-theme="dark"] .status-rejected   { background: #3b1010; color: #fca5a5; }
     </style>
+
+    <script>
+        // Apply saved theme before first paint to avoid flash
+        (function() {
+            const saved = localStorage.getItem('theme');
+            if (saved) document.documentElement.setAttribute('data-theme', saved);
+        })();
+    </script>
 </head>
 <body>
     <header class="site-header">
         <h1>job<span style="font-size: 1.2em; line-height: 1;">X</span>rch</h1>
+        <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">☀️</button>
     </header>
 
     <div class="layout">
@@ -217,10 +247,10 @@
         </tbody>
     </table>
     {% else %}
-    <div style="max-width: 700px; margin: 2rem auto; padding: 0 1rem;">
+    <div style="max-width: 1000px; margin: 2rem auto; padding: 0 1rem;">
 
-        <p style="font-size: 1rem; color: var(--pico-muted-color, #888); margin-bottom: 2rem;">
-            jobXrch is a local, AI-powered job search tracker — it fetches job postings, scores them against your career profile, and gives you a chat interface to reason through your options.
+        <p style="font-size: 1rem; color: var(--pico-muted-color, #4d0909); margin-bottom: 2rem;">
+            jobXrch is a local, AI-powered job search assistant and tracker — it fetches job postings, scores them against your career profile, and gives you a chat interface to reason through your options.
         </p>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2.5rem;">
@@ -246,30 +276,6 @@
             </div>
 
         </div>
-
-        <div style="text-align: center; font-size: 0.75rem; color: var(--pico-muted-color, #888); letter-spacing: 0.08em; margin-bottom: 0.5rem; text-transform: uppercase;">— example —</div>
-        <table style="opacity: 0.45; pointer-events: none;">
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Company</th>
-                    <th>Summary</th>
-                    <th>Score</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td><a href="#">Senior Software Engineer</a></td>
-                    <td><span>Acme Corp</span><br><span class="meta">Remote</span></td>
-                    <td><span class="preview">Strong match — Rust + distributed systems align well with your background. Equity comp below target.</span></td>
-                    <td><span class="score score-high">8</span></td>
-                    <td><span class="status-badge status-saved">saved</span></td>
-                    <td></td>
-                </tr>
-            </tbody>
-        </table>
 
     </div>
     {% endif %}
@@ -325,6 +331,20 @@
     });
 
     applyFilter();
+
+    // Theme toggle
+    const themeBtn = document.getElementById('theme-toggle');
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
+        localStorage.setItem('theme', theme);
+    }
+    // Sync button icon with current theme on load
+    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+    themeBtn.addEventListener('click', () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        applyTheme(next);
+    });
 
     async function reeval(btn, jobId) {
         btn.disabled = true;
