@@ -5,17 +5,22 @@ import threading
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from playwright.sync_api import sync_playwright
 from pydantic import BaseModel
 from src.db.database import (
-    init_db, is_job_saved, save_job, get_job_by_link,
-    get_job_id, save_evaluation, get_jobs_with_latest_evaluation,
-    update_job_status, get_job_with_evaluation, delete_job,
+    init_db,
+    save_evaluation,
+    get_jobs_with_latest_evaluation,
+    update_job_status,
+    get_job_with_evaluation,
+    delete_job,
     update_job_metadata,
-    get_profile, save_profile, get_profile_updated_at,
-    save_message, get_messages,
+    get_profile,
+    save_profile,
+    get_profile_updated_at,
+    save_message,
+    get_messages,
 )
-from src.fetcher.fetcher import fetch_job_description, fetch_job_details
+from src.fetcher.fetcher import ingest_job_from_url
 from src.llm_utils.evaluate import evaluate_job
 from src.llm_utils.chat import chat_reply
 from src.llm_utils.profile import distill_profile
@@ -40,11 +45,14 @@ def startup():
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     jobs = get_jobs_with_latest_evaluation()
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "jobs": jobs,
-        "status_flow": STATUS_FLOW,
-    })
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "jobs": jobs,
+            "status_flow": STATUS_FLOW,
+        },
+    )
 
 
 @app.get("/ingest", response_class=HTMLResponse)
@@ -54,31 +62,15 @@ def ingest_page(request: Request) -> HTMLResponse:
 
 
 def _run_ingest(task_id: str, url: str) -> None:
-    """Background task to ingest a job posting from a URL."""
+    """Background thread target: delegates to fetcher, updates task state."""
     try:
-        with sync_playwright() as p:
-            context = p.chromium.launch_persistent_context(
-                user_data_dir=SESSION_DIR,
-                headless=False,
-            )
-            if not is_job_saved(url):
-                details = fetch_job_details(context, url)
-                save_job({
-                    "job_title": details["job_title"],
-                    "company": details["company"],
-                    "location": details["location"],
-                    "link": url,
-                    "description": details["description"],
-                    "source": "manual",
-                })
-            context.close()
-
-        job = get_job_by_link(url)
-        result, chash = evaluate_job(job)
-        save_evaluation(job["id"], chash, result)
-        ingest_tasks[task_id] = {"status": "done", "job_id": job["id"]}
+        job_id = ingest_job_from_url(SESSION_DIR, url)
+        ingest_tasks[task_id] = {"status": "done", "job_id": job_id}
     except BaseException as e:
-        ingest_tasks[task_id] = {"status": "error", "message": f"{type(e).__name__}: {e}"}
+        ingest_tasks[task_id] = {
+            "status": "error",
+            "message": f"{type(e).__name__}: {e}",
+        }
 
 
 @app.post("/ingest")
@@ -117,7 +109,12 @@ def job_edit_page(request: Request, job_id: int):
 
 
 @app.post("/jobs/{job_id}/edit")
-def job_edit_save(job_id: int, job_title: str = Form(...), company: str = Form(...), location: str = Form(...)):
+def job_edit_save(
+    job_id: int,
+    job_title: str = Form(...),
+    company: str = Form(...),
+    location: str = Form(...),
+):
     update_job_metadata(job_id, job_title, company, location)
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
@@ -133,11 +130,14 @@ def job_detail(request: Request, job_id: int):
     job = get_job_with_evaluation(job_id)
     if not job:
         raise HTTPException(status_code=404)
-    return templates.TemplateResponse("job_detail.html", {
-        "request": request,
-        "job": job,
-        "status_flow": STATUS_FLOW,
-    })
+    return templates.TemplateResponse(
+        "job_detail.html",
+        {
+            "request": request,
+            "job": job,
+            "status_flow": STATUS_FLOW,
+        },
+    )
 
 
 @app.post("/jobs/{job_id}/delete")
@@ -148,6 +148,7 @@ def delete(job_id: int):
 
 # --- Chat ---
 
+
 class ChatRequest(BaseModel):
     messages: list[dict]
 
@@ -155,10 +156,13 @@ class ChatRequest(BaseModel):
 @app.get("/chat", response_class=HTMLResponse)
 def chat_page(request: Request):
     messages = get_messages()
-    return templates.TemplateResponse("chat.html", {
-        "request": request,
-        "messages": messages,
-    })
+    return templates.TemplateResponse(
+        "chat.html",
+        {
+            "request": request,
+            "messages": messages,
+        },
+    )
 
 
 @app.post("/chat/message")
@@ -178,11 +182,15 @@ def chat_message(body: ChatRequest):
         lines = ["| Title | Company | Score | Status |", "| --- | --- | --- | --- |"]
         for j in jobs:
             score = str(j["score"]) if j.get("score") else "—"
-            lines.append(f"| {j['job_title']} | {j['company']} | {score} | {j['status']} |")
+            lines.append(
+                f"| {j['job_title']} | {j['company']} | {score} | {j['status']} |"
+            )
         lines.append("\n## Job Details")
         for j in jobs:
             score = str(j["score"]) if j.get("score") else "N/A"
-            lines.append(f"\n### {j['job_title']} @ {j['company']} (score: {score}, status: {j['status']})")
+            lines.append(
+                f"\n### {j['job_title']} @ {j['company']} (score: {score}, status: {j['status']})"
+            )
             if j.get("description"):
                 lines.append(j["description"])
         db_context = "\n".join(lines)
@@ -206,15 +214,19 @@ def chat_distill():
 
 # --- Profile ---
 
+
 @app.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request):
     content = get_profile()
     updated_at = get_profile_updated_at()
-    return templates.TemplateResponse("profile.html", {
-        "request": request,
-        "content": content,
-        "updated_at": updated_at,
-    })
+    return templates.TemplateResponse(
+        "profile.html",
+        {
+            "request": request,
+            "content": content,
+            "updated_at": updated_at,
+        },
+    )
 
 
 @app.post("/profile")

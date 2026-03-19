@@ -39,8 +39,12 @@ def _open_page(context: BrowserContext, url: str) -> Page:
 
 
 def _extract_metadata_selectors(page: Page) -> dict:
-    title = _extract_text(page, "h1.top-card-layout__title") or _extract_text(page, "h1")
-    company = _extract_text(page, "a.topcard__org-name-link") or _extract_text(page, ".topcard__org-name-link")
+    title = _extract_text(page, "h1.top-card-layout__title") or _extract_text(
+        page, "h1"
+    )
+    company = _extract_text(page, "a.topcard__org-name-link") or _extract_text(
+        page, ".topcard__org-name-link"
+    )
     location = _extract_text(page, ".topcard__flavor--bullet")
     return {
         "job_title": title or "",
@@ -62,6 +66,37 @@ def fetch_job_description(context: BrowserContext, url: str) -> str:
         page.close()
 
 
+def ingest_job_from_url(session_dir: str, url: str) -> int:
+    """Given a job URL, fetch, save, and evaluate it. Returns the job ID."""
+    from playwright.sync_api import sync_playwright
+    from src.db.database import is_job_saved, save_job, get_job_by_link, save_evaluation
+    from src.llm_utils.evaluate import evaluate_job
+
+    with sync_playwright() as p:
+        context = p.chromium.launch_persistent_context(
+            user_data_dir=session_dir,
+            headless=False,
+        )
+        if not is_job_saved(url):
+            details = fetch_job_details(context, url)
+            save_job(
+                {
+                    "job_title": details["job_title"],
+                    "company": details["company"],
+                    "location": details["location"],
+                    "link": url,
+                    "description": details["description"],
+                    "source": "manual",
+                }
+            )
+        context.close()
+
+    job = get_job_by_link(url)
+    result, chash = evaluate_job(job)
+    save_evaluation(job["id"], chash, result)
+    return job["id"]
+
+
 def fetch_job_details(context: BrowserContext, url: str) -> dict:
     page = _open_page(context, url)
     try:
@@ -70,6 +105,7 @@ def fetch_job_details(context: BrowserContext, url: str) -> dict:
 
         if not metadata["job_title"] or not metadata["company"]:
             from src.llm_utils.evaluate import extract_metadata_from_text
+
             llm_meta = extract_metadata_from_text(description)
             if not metadata["job_title"]:
                 metadata["job_title"] = llm_meta.get("job_title", "Unknown")
@@ -85,6 +121,11 @@ def fetch_job_details(context: BrowserContext, url: str) -> dict:
         return metadata
     except Exception as e:
         print(f"Failed to fetch job details for {url}: {e}")
-        return {"job_title": "Unknown", "company": "", "location": "", "description": ""}
+        return {
+            "job_title": "Unknown",
+            "company": "",
+            "location": "",
+            "description": "",
+        }
     finally:
         page.close()
