@@ -217,7 +217,61 @@
         </tbody>
     </table>
     {% else %}
-        <p>No jobs yet. Paste a URL in the panel to get started.</p>
+    <div style="max-width: 700px; margin: 2rem auto; padding: 0 1rem;">
+
+        <p style="font-size: 1rem; color: var(--pico-muted-color, #888); margin-bottom: 2rem;">
+            jobXrch is a local, AI-powered job search tracker — it fetches job postings, scores them against your career profile, and gives you a chat interface to reason through your options.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2.5rem;">
+
+            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
+                <div style="font-weight: 600; margin-bottom: 0.4rem;">Job Board <span style="font-weight:400; font-size:0.8rem; color: var(--pico-muted-color, #888);">(this page)</span></div>
+                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Scored, filterable list of all your saved jobs. Sort by score, filter by status, re-evaluate anytime.</p>
+            </div>
+
+            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
+                <div style="font-weight: 600; margin-bottom: 0.4rem;">Add Job <a href="/ingest" style="font-weight:400; font-size:0.8rem;">/ingest</a></div>
+                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Paste a LinkedIn job URL — jobXrch fetches the full description and scores it against your profile automatically.</p>
+            </div>
+
+            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
+                <div style="font-weight: 600; margin-bottom: 0.4rem;">Chat <a href="/chat" style="font-weight:400; font-size:0.8rem;">/chat</a></div>
+                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Talk to an AI career coach with live access to your job list. Ask it to compare roles, surface patterns, or prep for interviews.</p>
+            </div>
+
+            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
+                <div style="font-weight: 600; margin-bottom: 0.4rem;">Profile <a href="/profile" style="font-weight:400; font-size:0.8rem;">/profile</a></div>
+                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Your career goals, preferences, and constraints. The LLM uses this to score every job. Keep it current; use Chat → "Save to profile" to distill insights automatically.</p>
+            </div>
+
+        </div>
+
+        <div style="text-align: center; font-size: 0.75rem; color: var(--pico-muted-color, #888); letter-spacing: 0.08em; margin-bottom: 0.5rem; text-transform: uppercase;">— example —</div>
+        <table style="opacity: 0.45; pointer-events: none;">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Company</th>
+                    <th>Summary</th>
+                    <th>Score</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><a href="#">Senior Software Engineer</a></td>
+                    <td><span>Acme Corp</span><br><span class="meta">Remote</span></td>
+                    <td><span class="preview">Strong match — Rust + distributed systems align well with your background. Equity comp below target.</span></td>
+                    <td><span class="score score-high">8</span></td>
+                    <td><span class="status-badge status-saved">saved</span></td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+
+    </div>
     {% endif %}
 
     </div>{# /.main #}
