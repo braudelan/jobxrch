@@ -1,3 +1,0 @@
-I am looking for a highly technical role centered on logic architecture and the engineering of data-driven detection systems. My goal is to own the end-to-end development of behavioral anomaly models and network entity classification frameworks, specifically within high-volume telemetry environments such as Cybersecurity, Data Infrastructure, or Fintech.
-
-I prioritize opportunities where I can leverage my proficiency in Python, advanced SQL, and dbt to build production-grade logic. I am explicitly avoiding standard Business Intelligence or marketing-focused analytics roles that prioritize dashboarding over core backend architecture.
