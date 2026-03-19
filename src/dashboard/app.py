@@ -20,7 +20,7 @@ from src.db.database import (
     save_message,
     get_messages,
 )
-from src.fetcher.fetcher import ingest_job_from_url
+from src.scraper.fetcher import ingest_job_from_url
 from src.llm_utils.evaluate import evaluate_job
 from src.llm_utils.chat import chat_reply
 from src.llm_utils.profile import distill_profile

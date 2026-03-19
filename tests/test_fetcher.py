@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
 from playwright.sync_api import sync_playwright
-from src.fetcher.fetcher import fetch_job_description
+from src.scraper.fetcher import fetch_job_description
 
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "..", ".session")
 

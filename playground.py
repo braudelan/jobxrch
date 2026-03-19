@@ -160,7 +160,7 @@ if RUN_FETCHER:
     print("="*60)
     import os
     from playwright.sync_api import sync_playwright
-    from src.fetcher.fetcher import fetch_job_details
+    from src.scraper.fetcher import fetch_job_details
 
     SESSION_DIR = os.path.join(os.path.dirname(__file__), ".session")
     URL = "https://www.linkedin.com/jobs/view/1234567890"  # replace with a real URL
