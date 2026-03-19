@@ -1,4 +1,9 @@
-# src/fetcher/fetcher.py
+# src/scraper/fetcher.py
+"""
+Fetches job descriptions and metadata from job posting URLs using Playwright.
+Designed for LinkedIn job postings but can be adapted for others. Provides functions to extract job details and ingest them into the system, including
+LLM-based metadata extraction as a fallback when selectors fail. Returns structured job data for storage and evaluation.
+"""
 from playwright.sync_api import BrowserContext, Page
 
 

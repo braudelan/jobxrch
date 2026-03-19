@@ -1,4 +1,4 @@
-# src/dashboard/app.py
+# src/web/app.py
 import os
 import uuid
 import threading

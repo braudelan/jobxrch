@@ -1,4 +1,8 @@
 # src/scraper/parser.py
+"""
+Parses raw text from LinkedIn job cards into structured data. Cleans noise like "Promoted" badges and extracts job title, company, location, and link. 
+Designed to handle variations in card formats and ensure consistent output for downstream processing.
+"""
 
 def clean_job_card_data(raw_text, raw_link):
     """

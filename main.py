@@ -1,4 +1,9 @@
 # main.py
+"""
+Command-line interface for JobXrch. 
+Provides commands to run the LinkedIn scraping and evaluation pipeline, as well as to start the dashboard. 
+Uses Click for CLI and Uvicorn for the dashboard server.
+"""
 import click
 import uvicorn
 
@@ -47,7 +52,7 @@ def evaluate_all(force):
 @click.option("--port", default=8000, help="Port to run the dashboard on.")
 def dashboard(port):
     """Start the job evaluation dashboard."""
-    uvicorn.run("src.dashboard.app:app", host="127.0.0.1", port=port, reload=True,
+    uvicorn.run("src.web.app:app", host="127.0.0.1", port=port, reload=True,
                 reload_includes=["*.html", "*.css", "*.js"])
 
 
