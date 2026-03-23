@@ -121,7 +121,9 @@ def test_evaluate_job_returns_result_and_hash(tmp_path, monkeypatch):
     save_profile("I am a data engineer with 5 years experience.")
 
     with patch("src.llm_utils.evaluate._load_provider") as mock_load:
-        mock_load.return_value = lambda prompt: _VALID_RESPONSE
+        mock_provider = MagicMock(spec=["complete"])
+        mock_provider.complete.return_value = _VALID_RESPONSE
+        mock_load.return_value = mock_provider
         result, chash = evaluate_job(_SAMPLE_JOB)
 
     assert isinstance(result, EvaluationResult)

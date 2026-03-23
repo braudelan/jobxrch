@@ -1,5 +1,5 @@
 # src/llm_utils/chat.py
-import anthropic
+import importlib
 import os
 from typing import Callable, Optional
 
@@ -26,22 +26,20 @@ _SEARCH_TOOL = {
 }
 
 
+def _load_provider():
+    provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
+    return importlib.import_module(f"src.llm_utils.providers.{provider_name}")
+
+
 def chat_reply(
     messages: list[dict],
     db_context: str,
     profile: str = "",
     search_fn: Optional[Callable[[str], str]] = None,
 ) -> str:
-    """Send conversation history + DB context to the LLM, return assistant reply.
-
-    search_fn: optional callable (query: str) -> str. Defaults to whichever
-    provider is configured via environment variables. Pass None explicitly to
-    disable search entirely.
-    """
+    """Send conversation history + DB context to the LLM, return assistant reply."""
     if search_fn is None:
         search_fn = get_search_fn()
-
-    tools = [_SEARCH_TOOL] if search_fn else []
 
     profile_section = f"Here is what you know about the candidate:\n{profile.strip()}\n" if profile.strip() else ""
     search_instruction = "If you need more context about a company or role, use the search_web tool." if search_fn else ""
@@ -57,36 +55,7 @@ Help them think through their job search, discuss specific roles, and give hones
 When they ask about specific jobs, reference the data above. Be direct, specific, and conversational.
 {search_instruction}"""
 
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"]) 
-    working_messages = list(messages)
-
-    while True:
-        kwargs = {"tools": tools} if tools else {}
-        response = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=system,
-            messages=working_messages,
-            **kwargs,
-        )
-
-        if response.stop_reason != "tool_use":
-            for block in response.content:
-                if hasattr(block, "text"):
-                    return block.text
-            return ""
-
-        tool_results = []
-        for block in response.content:
-            if block.type != "tool_use" or block.name != "search_web":
-                continue
-            query = block.input.get("query", "")
-            result = search_fn(query)
-            tool_results.append(
-                {"type": "tool_result", "tool_use_id": block.id, "content": result}
-            )
-
-        working_messages = working_messages + [
-            {"role": "assistant", "content": response.content},
-            {"role": "user", "content": tool_results},
-        ]
+    provider = _load_provider()
+    if search_fn and hasattr(provider, "chat_with_tools"):
+        return provider.chat_with_tools(system, messages, [_SEARCH_TOOL], search_fn)
+    return provider.complete(f"{system}\n\n{messages[-1]['content']}")

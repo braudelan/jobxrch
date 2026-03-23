@@ -37,7 +37,7 @@ def _tool_use_response(tool_id: str, query: str):
 # --- basic ---
 
 def test_chat_reply_returns_text_from_mock():
-    with patch("anthropic.Anthropic", return_value=_mock_client("Here is my advice.")):
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=_mock_client("Here is my advice.")):
         result = chat_reply([{"role": "user", "content": "What should I do?"}], "No jobs yet.")
     assert result == "Here is my advice."
 
@@ -45,7 +45,7 @@ def test_chat_reply_returns_text_from_mock():
 def test_chat_reply_system_contains_db_context():
     db_ctx = "| SWE | Acme | 8 | saved |"
     client = _mock_client("ok")
-    with patch("anthropic.Anthropic", return_value=client):
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=client):
         chat_reply([{"role": "user", "content": "hi"}], db_ctx)
     assert db_ctx in client.messages.create.call_args[1]["system"]
 
@@ -53,7 +53,7 @@ def test_chat_reply_system_contains_db_context():
 def test_chat_reply_forwards_messages():
     messages = [{"role": "user", "content": "tell me about job X"}]
     client = _mock_client("ok")
-    with patch("anthropic.Anthropic", return_value=client):
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=client):
         chat_reply(messages, "ctx")
     assert client.messages.create.call_args[1]["messages"] == messages
 
@@ -64,7 +64,7 @@ def test_chat_reply_no_search_when_no_keys(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
 
-    with patch("anthropic.Anthropic", return_value=_mock_client("ok")):
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=_mock_client("ok")):
         chat_reply([{"role": "user", "content": "hi"}], "ctx")
 
     # No tools should be passed when no provider is configured
@@ -80,7 +80,7 @@ def test_chat_reply_calls_search_fn(monkeypatch):
         _mock_client("Stripe processes payments.").messages.create.return_value,
     ]
 
-    with patch("anthropic.Anthropic", return_value=client):
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=client):
         result = chat_reply(
             [{"role": "user", "content": "Tell me about Stripe"}],
             "No jobs yet.",
@@ -108,7 +108,7 @@ def test_chat_reply_search_result_passed_in_followup(monkeypatch):
         final_resp,
     ]
 
-    with patch("anthropic.Anthropic", return_value=client):
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=client):
         chat_reply(
             [{"role": "user", "content": "Tell me about Stripe"}],
             "No jobs yet.",

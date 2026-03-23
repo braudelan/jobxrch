@@ -15,16 +15,43 @@ class EvaluationResult(BaseModel):
     assessment: str
 
 
+_SEARCH_TOOL = {
+    "name": "search_web",
+    "description": (
+        "Search the web for information about a company — its industry, size, culture, "
+        "products, or recent news — to inform a more accurate job evaluation."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {"type": "string", "description": "The search query to run."}
+        },
+        "required": ["query"],
+    },
+}
+
+
 def _load_provider():
     provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
-    module = importlib.import_module(f"src.llm_utils.providers.{provider_name}")
-    return module.complete
+    return importlib.import_module(f"src.llm_utils.providers.{provider_name}")
 
 
-def _build_prompt(job: dict, profile: str) -> str:
+def _complete(prompt: str, search_fn=None) -> str:
+    provider = _load_provider()
+    if search_fn and hasattr(provider, "complete_with_tools"):
+        return provider.complete_with_tools(prompt, [_SEARCH_TOOL], search_fn)
+    return provider.complete(prompt)
+
+
+def _build_prompt(job: dict, profile: str, with_search: bool = False) -> str:
     profile_section = profile.strip() if profile.strip() else "(No profile set — evaluate on general merit.)"
+    web_search_instruction = (
+        "\nIf you are unfamiliar with the company or need more context about it, "
+        "use the search_web tool before evaluating.\n"
+        if with_search else ""
+    )
     return f"""You are a career coach evaluating a job on behalf of a candidate you know well.
-
+{web_search_instruction}
 Here is everything you know about the candidate:
 {profile_section}
 
@@ -69,11 +96,14 @@ def profile_hash(profile: str) -> str:
 def evaluate_job(job: dict) -> tuple[EvaluationResult, str]:
     """Returns (EvaluationResult, profile_hash)."""
     from src.db.database import get_profile
+    from src.llm_utils.search import get_search_fn
+
     profile = get_profile()
     if not profile.strip():
         import warnings
         warnings.warn("User profile is empty — evaluation will be generic.")
-    prompt = _build_prompt(job, profile)
-    complete = _load_provider()
-    raw = complete(prompt)
+
+    search_fn = get_search_fn()
+    prompt = _build_prompt(job, profile, with_search=bool(search_fn))
+    raw = _complete(prompt, search_fn)
     return _parse_response(raw), profile_hash(profile)
