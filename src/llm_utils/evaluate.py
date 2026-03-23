@@ -66,32 +66,6 @@ def profile_hash(profile: str) -> str:
     return hashlib.sha256(profile.encode()).hexdigest()[:12]
 
 
-def extract_metadata_from_text(description: str) -> dict:
-    """Use LLM to extract job_title, company, location from a job description."""
-    prompt = f"""Extract the job title, company name, and location from the following job posting text.
-
-Return JSON only — no markdown wrapper, no text outside the JSON:
-{{
-  "job_title": "<job title or empty string if not found>",
-  "company": "<company name or empty string if not found>",
-  "location": "<location or empty string if not found>"
-}}
-
-Job posting text:
-{description[:3000]}"""
-    complete = _load_provider()
-    raw = complete(prompt)
-    try:
-        data = json.loads(_strip_fences(raw))
-        return {
-            "job_title": data.get("job_title", "") or "",
-            "company": data.get("company", "") or "",
-            "location": data.get("location", "") or "",
-        }
-    except (json.JSONDecodeError, KeyError):
-        return {"job_title": "", "company": "", "location": ""}
-
-
 def evaluate_job(job: dict) -> tuple[EvaluationResult, str]:
     """Returns (EvaluationResult, profile_hash)."""
     from src.db.database import get_profile

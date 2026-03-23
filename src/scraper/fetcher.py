@@ -4,7 +4,46 @@ Fetches job descriptions and metadata from job posting URLs using Playwright.
 Designed for LinkedIn job postings but can be adapted for others. Provides functions to extract job details and ingest them into the system, including
 LLM-based metadata extraction as a fallback when selectors fail. Returns structured job data for storage and evaluation.
 """
+import json
 from playwright.sync_api import BrowserContext, Page
+
+
+def _strip_fences(raw: str) -> str:
+    s = raw.strip()
+    if s.startswith("```"):
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+    if s.endswith("```"):
+        s = s.rsplit("```", 1)[0]
+    return s.strip()
+
+
+def extract_metadata_from_text(description: str) -> dict:
+    """Use LLM to extract job_title, company, location from a job description."""
+    import importlib, os
+    provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
+    complete = importlib.import_module(f"src.llm_utils.providers.{provider_name}").complete
+
+    prompt = f"""Extract the job title, company name, and location from the following job posting text.
+
+Return JSON only — no markdown wrapper, no text outside the JSON:
+{{
+  "job_title": "<job title or empty string if not found>",
+  "company": "<company name or empty string if not found>",
+  "location": "<location or empty string if not found>"
+}}
+
+Job posting text:
+{description[:3000]}"""
+    raw = complete(prompt)
+    try:
+        data = json.loads(_strip_fences(raw))
+        return {
+            "job_title": data.get("job_title", "") or "",
+            "company": data.get("company", "") or "",
+            "location": data.get("location", "") or "",
+        }
+    except (json.JSONDecodeError, KeyError):
+        return {"job_title": "", "company": "", "location": ""}
 
 
 def _expand_job_description(page: Page) -> None:
@@ -109,8 +148,6 @@ def fetch_job_details(context: BrowserContext, url: str) -> dict:
         metadata = _extract_metadata_selectors(page)
 
         if not metadata["job_title"] or not metadata["company"]:
-            from src.llm_utils.evaluate import extract_metadata_from_text
-
             llm_meta = extract_metadata_from_text(description)
             if not metadata["job_title"]:
                 metadata["job_title"] = llm_meta.get("job_title", "Unknown")

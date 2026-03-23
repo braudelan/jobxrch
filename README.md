@@ -55,6 +55,9 @@ The profile replaces a static criteria file. Preferences are distilled from conv
 ### Near-term
 
 - Named conversations and job-scoped chat — conversations tied to a specific posting ("chat about this job" from the detail page), saved and resumable.
+- Fine-tune UI/UX:
+    - Better progress/status indication for the manual URL ingestion page.
+    - 
 - Browser extension as a clip-from-anywhere ingest layer
 - Job age/staleness indicators
 

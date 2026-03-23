@@ -77,13 +77,15 @@
         .input-row textarea {
             flex: 1;
             resize: none;
-            height: 2.4rem;
+            min-height: 4rem;
             font-size: 1rem;
-            padding: 0.4rem 0.6rem;
+            padding: 0.5rem 0.75rem;
             border-radius: 8px;
             margin: 0;
             field-sizing: content;
-            max-height: 8rem;
+            max-height: 16rem;
+            overflow-y: auto;
+            line-height: 1.5;
         }
         .input-row button {
             padding: 0.4rem 1rem;
@@ -193,7 +195,7 @@
         const text = inputEl.value.trim();
         if (!text) return;
         inputEl.value = '';
-        inputEl.style.height = '';
+        inputEl.style.height = 'auto';
 
         appendMsg('user', text);
         history.push({ role: 'user', content: text });
@@ -224,6 +226,13 @@
             inputEl.focus();
         }
     }
+
+    // Auto-resize fallback for browsers without field-sizing: content
+    function autoResize() {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 256) + 'px';
+    }
+    inputEl.addEventListener('input', autoResize);
 
     sendBtn.addEventListener('click', sendMessage);
     inputEl.addEventListener('keydown', e => {
