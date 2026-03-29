@@ -9,9 +9,9 @@ from pydantic import BaseModel
 from src.db.database import (
     init_db,
     save_evaluation,
-    get_jobs_with_latest_evaluation,
+    get_all_jobs,
     update_job_status,
-    get_job_with_evaluation,
+    get_job,
     delete_job,
     update_job_metadata,
     get_profile,
@@ -44,7 +44,7 @@ def startup():
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    jobs = get_jobs_with_latest_evaluation()
+    jobs = get_all_jobs()
     return templates.TemplateResponse(
         "index.html",
         {
@@ -92,7 +92,7 @@ def ingest_status(task_id: str):
 
 @app.post("/jobs/{job_id}/evaluate")
 def reevaluate(job_id: int):
-    job = get_job_with_evaluation(job_id)
+    job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404)
     result, chash = evaluate_job(job)
@@ -102,7 +102,7 @@ def reevaluate(job_id: int):
 
 @app.get("/jobs/{job_id}/edit", response_class=HTMLResponse)
 def job_edit_page(request: Request, job_id: int):
-    job = get_job_with_evaluation(job_id)
+    job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse("job_edit.html", {"request": request, "job": job})
@@ -127,7 +127,7 @@ def set_status(job_id: int, status: str = Form(...)):
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
 def job_detail(request: Request, job_id: int):
-    job = get_job_with_evaluation(job_id)
+    job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404)
     return templates.TemplateResponse(
@@ -176,28 +176,7 @@ def chat_message(body: ChatRequest):
     if last["role"] == "user":
         save_message("user", last["content"])
 
-    # Build DB context snapshot
-    jobs = get_jobs_with_latest_evaluation()
-    if jobs:
-        lines = ["| Title | Company | Score | Status |", "| --- | --- | --- | --- |"]
-        for j in jobs:
-            score = str(j["score"]) if j.get("score") else "—"
-            lines.append(
-                f"| {j['job_title']} | {j['company']} | {score} | {j['status']} |"
-            )
-        lines.append("\n## Job Details")
-        for j in jobs:
-            score = str(j["score"]) if j.get("score") else "N/A"
-            lines.append(
-                f"\n### {j['job_title']} @ {j['company']} (score: {score}, status: {j['status']})"
-            )
-            if j.get("description"):
-                lines.append(j["description"])
-        db_context = "\n".join(lines)
-    else:
-        db_context = "No jobs saved yet."
-
-    reply = chat_reply(messages, db_context, get_profile())
+    reply = chat_reply(messages)
     save_message("assistant", reply)
     return JSONResponse({"reply": reply})
 

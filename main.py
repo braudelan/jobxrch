@@ -1,9 +1,10 @@
 # main.py
 """
-Command-line interface for JobXrch. 
-Provides commands to run the LinkedIn scraping and evaluation pipeline, as well as to start the dashboard. 
+Command-line interface for JobXrch.
+Provides commands to run the LinkedIn scraping and evaluation pipeline, as well as to start the dashboard.
 Uses Click for CLI and Uvicorn for the dashboard server.
 """
+
 import click
 import uvicorn
 
@@ -17,27 +18,40 @@ def cli():
 def pipeline():
     """Crawl LinkedIn saved jobs, fetch JDs, evaluate, and save to DB."""
     from src.pipelines.linkedin import run
+
     run()
 
 
 @cli.command("evaluate-all")
-@click.option("--force", is_flag=True, default=False, help="Re-evaluate jobs that already have an evaluation.")
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Re-evaluate jobs that already have an evaluation.",
+)
 def evaluate_all(force):
     """Evaluate all unevaluated jobs (or all jobs with --force)."""
-    from src.db.database import init_db, get_unevaluated_jobs, get_jobs_with_latest_evaluation, save_evaluation
+    from src.db.database import (
+        init_db,
+        get_unevaluated_jobs,
+        get_all_jobs,
+        save_evaluation,
+    )
     from src.llm_utils.evaluate import evaluate_job
 
     init_db()
 
     if force:
-        jobs = [j for j in get_jobs_with_latest_evaluation() if j.get("description")]
+        jobs = [j for j in get_all_jobs() if j.get("description")]
         click.echo(f"Force mode: evaluating {len(jobs)} jobs.")
     else:
         jobs = [j for j in get_unevaluated_jobs() if j.get("description")]
         click.echo(f"Found {len(jobs)} unevaluated jobs.")
 
     for i, job in enumerate(jobs, 1):
-        click.echo(f"[{i}/{len(jobs)}] {job['job_title']} @ {job['company']} ... ", nl=False)
+        click.echo(
+            f"[{i}/{len(jobs)}] {job['job_title']} @ {job['company']} ... ", nl=False
+        )
         try:
             result, chash = evaluate_job(job)
             save_evaluation(job["id"], chash, result)
@@ -52,8 +66,13 @@ def evaluate_all(force):
 @click.option("--port", default=8000, help="Port to run the dashboard on.")
 def dashboard(port):
     """Start the job evaluation dashboard."""
-    uvicorn.run("src.web.app:app", host="127.0.0.1", port=port, reload=True,
-                reload_includes=["*.html", "*.css", "*.js"])
+    uvicorn.run(
+        "src.web.app:app",
+        host="127.0.0.1",
+        port=port,
+        reload=True,
+        reload_includes=["*.html", "*.css", "*.js"],
+    )
 
 
 if __name__ == "__main__":

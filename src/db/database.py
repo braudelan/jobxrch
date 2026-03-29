@@ -41,19 +41,29 @@ def init_db() -> None:
         # Migrations for evaluations table
         eval_cols = {row[1] for row in conn.execute("PRAGMA table_info(evaluations)")}
         if "score" not in eval_cols:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN score INTEGER NOT NULL DEFAULT 0")
+            conn.execute(
+                "ALTER TABLE evaluations ADD COLUMN score INTEGER NOT NULL DEFAULT 0"
+            )
         if "summary" not in eval_cols:
-            conn.execute("ALTER TABLE evaluations ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
+            conn.execute(
+                "ALTER TABLE evaluations ADD COLUMN summary TEXT NOT NULL DEFAULT ''"
+            )
         # Migrations for jobs table
         job_cols = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
         if "status" not in job_cols:
-            conn.execute("ALTER TABLE jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'saved'")
+            conn.execute(
+                "ALTER TABLE jobs ADD COLUMN status TEXT NOT NULL DEFAULT 'saved'"
+            )
         if "deleted" not in job_cols:
-            conn.execute("ALTER TABLE jobs ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0")
+            conn.execute(
+                "ALTER TABLE jobs ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"
+            )
         # Migration: add source column to existing DBs that predate it
         existing = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
         if "source" not in existing:
-            conn.execute("ALTER TABLE jobs ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'")
+            conn.execute(
+                "ALTER TABLE jobs ADD COLUMN source TEXT NOT NULL DEFAULT 'unknown'"
+            )
         conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_messages (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,10 +104,20 @@ def get_job_id(link: str) -> Optional[int]:
 
 def save_evaluation(job_id: int, criteria_hash: str, result) -> None:
     with _connect() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO evaluations (job_id, criteria_hash, score, summary, assessment, evaluated_at)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (job_id, criteria_hash, result.score, result.summary, result.assessment, datetime.now(timezone.utc).isoformat()))
+        """,
+            (
+                job_id,
+                criteria_hash,
+                result.score,
+                result.summary,
+                result.assessment,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
 
 
 def get_job_by_link(link: str) -> Optional[dict]:
@@ -107,7 +127,7 @@ def get_job_by_link(link: str) -> Optional[dict]:
         return dict(row) if row else None
 
 
-def get_jobs_with_latest_evaluation() -> list[dict]:
+def get_all_jobs() -> list[dict]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute("""
@@ -147,10 +167,11 @@ def get_unevaluated_jobs() -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def get_job_with_evaluation(job_id: int) -> Optional[dict]:
+def get_job(job_id: int) -> Optional[dict]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT j.*, e.score, e.summary, e.assessment, e.criteria_hash, e.evaluated_at
             FROM jobs j
             LEFT JOIN (
@@ -158,11 +179,15 @@ def get_job_with_evaluation(job_id: int) -> Optional[dict]:
                 WHERE id IN (SELECT MAX(id) FROM evaluations GROUP BY job_id)
             ) e ON j.id = e.job_id
             WHERE j.id = ?
-        """, (job_id,)).fetchone()
+        """,
+            (job_id,),
+        ).fetchone()
         return dict(row) if row else None
 
 
-def update_job_metadata(job_id: int, job_title: str, company: str, location: str) -> None:
+def update_job_metadata(
+    job_id: int, job_title: str, company: str, location: str
+) -> None:
     with _connect() as conn:
         conn.execute(
             "UPDATE jobs SET job_title = ?, company = ?, location = ? WHERE id = ?",
@@ -177,10 +202,13 @@ def delete_job(job_id: int) -> None:
 
 def save_job(job: dict) -> None:
     with _connect() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO jobs (job_title, company, location, link, description, source, scraped_at)
             VALUES (:job_title, :company, :location, :link, :description, :source, :scraped_at)
-        """, {**job, "scraped_at": datetime.now(timezone.utc).isoformat()})
+        """,
+            {**job, "scraped_at": datetime.now(timezone.utc).isoformat()},
+        )
 
 
 def get_profile() -> str:
@@ -191,15 +219,20 @@ def get_profile() -> str:
 
 def save_profile(content: str) -> None:
     with _connect() as conn:
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO user_profile (id, content, updated_at) VALUES (1, ?, ?)
             ON CONFLICT(id) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at
-        """, (content, datetime.now(timezone.utc).isoformat()))
+        """,
+            (content, datetime.now(timezone.utc).isoformat()),
+        )
 
 
 def get_profile_updated_at() -> Optional[str]:
     with _connect() as conn:
-        row = conn.execute("SELECT updated_at FROM user_profile WHERE id = 1").fetchone()
+        row = conn.execute(
+            "SELECT updated_at FROM user_profile WHERE id = 1"
+        ).fetchone()
         return row[0] if row else None
 
 
@@ -224,6 +257,7 @@ def get_messages_since(since_id: int) -> list[dict]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT * FROM chat_messages WHERE id > ? ORDER BY created_at ASC", (since_id,)
+            "SELECT * FROM chat_messages WHERE id > ? ORDER BY created_at ASC",
+            (since_id,),
         ).fetchall()
         return [dict(r) for r in rows]

@@ -1,12 +1,13 @@
 # src/llm_utils/chat.py
 import importlib
 import os
-from typing import Callable, Optional
 
+from src.db.database import get_profile, get_all_jobs, get_job
+from src.llm_utils.context import format_job_list, format_job
 from src.llm_utils.search import get_search_fn
 
 
-_SEARCH_TOOL = {
+_SEARCH_WEB_TOOL = {
     "name": "search_web",
     "description": (
         "Search the web for up-to-date information about companies, roles, industries, "
@@ -25,37 +26,112 @@ _SEARCH_TOOL = {
     },
 }
 
+_GET_JOB_LIST_TOOL = {
+    "name": "get_job_list",
+    "description": (
+        "Get a summary of all jobs in the user's job list, including ID, title, company, "
+        "AI fit score, and current status. Use this when the user asks about their job list, "
+        "wants to compare roles, or needs to know which jobs are saved."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {},
+    },
+}
+
+_GET_JOB_DETAILS_TOOL = {
+    "name": "get_job_details",
+    "description": (
+        "Retrieve the full job description and AI assessment for a specific job. "
+        "Use this when the user asks about the details of a role — requirements, responsibilities, etc."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "job_id": {
+                "type": "integer",
+                "description": "The job ID from the job list.",
+            }
+        },
+        "required": ["job_id"],
+    },
+}
+
 
 def _load_provider():
     provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
     return importlib.import_module(f"src.llm_utils.providers.{provider_name}")
 
 
-def chat_reply(
-    messages: list[dict],
-    db_context: str,
-    profile: str = "",
-    search_fn: Optional[Callable[[str], str]] = None,
+def _build_system_prompt(
+    profile: str,
+    static_blocks: list[str] = [],
+    tool_hints: list[str] = [],
 ) -> str:
-    """Send conversation history + DB context to the LLM, return assistant reply."""
-    if search_fn is None:
-        search_fn = get_search_fn()
+    """Assemble the system prompt from various pieces of context and instructions."""
+    role = "You are a helpful career coach assistant for a job seeker."
+    tone = "Be direct, specific, and conversational."
+    profile_string = f"Here is what you know about the candidate:\n {profile}" 
+    parts = [
+        role, 
+        tone, 
+        profile_string, 
+        *static_blocks
+    ]
+    if tool_hints:
+        parts.extend(tool_hints)
+    return "\n\n".join(parts)
 
-    profile_section = f"Here is what you know about the candidate:\n{profile.strip()}\n" if profile.strip() else ""
-    search_instruction = "If you need more context about a company or role, use the search_web tool." if search_fn else ""
-    system = f"""
-You are a helpful career coach assistant for a job seeker. You have access to their current job list.
-{profile_section}
-Here is the current state of their job search (live snapshot):
-{db_context}
 
-In the job list above: score is an AI-assessed fit rating (1–10); a missing score (—) means the job hasn't been evaluated yet. Status is set manually by the user.
+def chat_reply(messages: list[dict]) -> str:
+    """General chat — no static job context. LLM fetches job data on demand via tools."""
+    profile = get_profile()
+    search_fn = get_search_fn()
 
-Help them think through their job search, discuss specific roles, and give honest career advice.
-When they ask about specific jobs, reference the data above. Be direct, specific, and conversational.
-{search_instruction}"""
+    tool_handlers = {
+        "get_job_list": lambda _inp: format_job_list(get_all_jobs()),
+        "get_job_details": lambda inp: (
+            format_job(j) if (j := get_job(inp["job_id"])) else f"No job found with ID {inp['job_id']}."
+        ),
+    }
+    tools = [_GET_JOB_LIST_TOOL, _GET_JOB_DETAILS_TOOL]
+    tool_hints = ["Use the get_job_list tool to see the user's saved jobs, and get_job_details to fetch a specific role."]
 
-    provider = _load_provider()
-    if search_fn and hasattr(provider, "chat_with_tools"):
-        return provider.chat_with_tools(system, messages, [_SEARCH_TOOL], search_fn)
-    return provider.complete(f"{system}\n\n{messages[-1]['content']}")
+    if search_fn:
+        tool_handlers["search_web"] = lambda inp: search_fn(inp["query"])
+        tools.append(_SEARCH_WEB_TOOL)
+        tool_hints.append("Use the search_web tool for up-to-date information about companies or roles.")
+
+    system = _build_system_prompt(
+        profile,
+        static_blocks=["Help them think through their job search, discuss specific roles, and give honest career advice."],
+        tool_hints=tool_hints,
+    )
+    return _load_provider().chat(system, messages, tools, tool_handlers)
+
+
+def job_chat_reply(job_id: int, messages: list[dict]) -> str:
+    """Job-specific chat — pre-loads the target job as static context."""
+    profile = get_profile()
+    search_fn = get_search_fn()
+    job = get_job(job_id)
+    job_details = format_job(job) if job else f"No job found with ID {job_id}."
+
+    tool_handlers = {}
+    tools = []
+    tool_hints = []
+
+    if search_fn:
+        tool_handlers["search_web"] = lambda inp: search_fn(inp["query"])
+        tools.append(_SEARCH_WEB_TOOL)
+        tool_hints.append("Use the search_web tool for up-to-date information about this company or role.")
+
+    system = _build_system_prompt(
+        profile,
+        static_blocks=[
+            f"The user is discussing this specific role:\n\n{job_details}",
+            "Help them evaluate this role, prepare for interviews, or think through whether it's a good fit.",
+        ],
+        tool_hints=tool_hints,
+    )
+    return _load_provider().chat(system, messages, tools or None, tool_handlers or None)

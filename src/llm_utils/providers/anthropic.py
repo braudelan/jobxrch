@@ -12,7 +12,10 @@ def _get_client():
     return _client
 
 
-def complete(prompt: str) -> str:
+def complete(prompt: str, tools: list = None, tool_handlers: dict = None) -> str:
+    """Single-turn completion with optional tool use."""
+    if tools:
+        return _tool_loop([{"role": "user", "content": prompt}], tools, tool_handlers)
     message = _get_client().messages.create(
         model="claude-sonnet-4-6",
         max_tokens=2048,
@@ -21,18 +24,21 @@ def complete(prompt: str) -> str:
     return message.content[0].text
 
 
-def chat(system: str, messages: list) -> str:
+def chat(system: str, messages: list, tools: list = None, tool_handlers: dict = None) -> str:
+    """Multi-turn chat with optional tool use."""
+    if tools:
+        return _tool_loop(messages, tools, tool_handlers, system=system)
     message = _get_client().messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1024,
+        max_tokens=2048,
         system=system,
         messages=messages,
     )
     return message.content[0].text
 
 
-def _tool_loop(messages: list, tools: list, search_fn, system: str = None) -> str:
-    """Shared agentic tool-use loop. Returns the final text reply."""
+def _tool_loop(messages: list, tools: list, tool_handlers: dict, system: str = None) -> str:
+    """Agentic tool-use loop. Returns the final text reply."""
     kwargs = {"system": system} if system else {}
 
     while True:
@@ -52,9 +58,9 @@ def _tool_loop(messages: list, tools: list, search_fn, system: str = None) -> st
 
         tool_results = []
         for block in response.content:
-            if block.type != "tool_use" or block.name != "search_web":
+            if block.type != "tool_use" or block.name not in tool_handlers:
                 continue
-            result = search_fn(block.input.get("query", ""))
+            result = tool_handlers[block.name](block.input)
             tool_results.append(
                 {"type": "tool_result", "tool_use_id": block.id, "content": result}
             )
@@ -65,9 +71,3 @@ def _tool_loop(messages: list, tools: list, search_fn, system: str = None) -> st
         ]
 
 
-def complete_with_tools(prompt: str, tools: list, search_fn) -> str:
-    return _tool_loop([{"role": "user", "content": prompt}], tools, search_fn)
-
-
-def chat_with_tools(system: str, messages: list, tools: list, search_fn) -> str:
-    return _tool_loop(messages, tools, search_fn, system=system)

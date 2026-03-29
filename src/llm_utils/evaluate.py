@@ -38,8 +38,8 @@ def _load_provider():
 
 def _complete(prompt: str, search_fn=None) -> str:
     provider = _load_provider()
-    if search_fn and hasattr(provider, "complete_with_tools"):
-        return provider.complete_with_tools(prompt, [_SEARCH_TOOL], search_fn)
+    if search_fn:
+        return provider.complete(prompt, [_SEARCH_TOOL], {"search_web": lambda inp: search_fn(inp["query"])})
     return provider.complete(prompt)
 
 

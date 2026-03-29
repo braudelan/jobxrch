@@ -10,15 +10,16 @@ Sections are ordered cheapest → most expensive (no I/O → DB → LLM → brow
 """
 
 import sys
+
 sys.path.insert(0, ".")
 
 # ── Toggle which sections run ────────────────────────────────────────────────
-RUN_PARSER   = True   # pure logic, no I/O
-RUN_DB       = True   # SQLite only
+RUN_PARSER = True  # pure logic, no I/O
+RUN_DB = True  # SQLite only
 RUN_EVALUATE = False  # LLM call (costs tokens)
-RUN_CHAT     = False  # LLM call (costs tokens)
-RUN_DISTILL  = False  # LLM call (costs tokens)
-RUN_FETCHER  = False  # requires Playwright + LinkedIn browser session
+RUN_CHAT = False  # LLM call (costs tokens)
+RUN_DISTILL = False  # LLM call (costs tokens)
+RUN_FETCHER = False  # requires Playwright + LinkedIn browser session
 # ────────────────────────────────────────────────────────────────────────────
 
 
@@ -47,9 +48,9 @@ SAMPLE_PROFILE = (
 
 # ── 1. PARSER ────────────────────────────────────────────────────────────────
 if RUN_PARSER:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("PARSER — clean_job_card_data")
-    print("="*60)
+    print("=" * 60)
     from src.scraper.parser import clean_job_card_data
 
     raw_text = "Staff Engineer\nAcme Corp\nRemote\nPromoted\nActively recruiting"
@@ -62,13 +63,18 @@ if RUN_PARSER:
 
 # ── 2. DB ────────────────────────────────────────────────────────────────────
 if RUN_DB:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DB — init, save_job, query")
-    print("="*60)
+    print("=" * 60)
     from src.db.database import (
-        init_db, save_job, is_job_saved, get_job_by_link,
-        get_jobs_with_latest_evaluation, get_unevaluated_jobs,
-        get_profile, get_messages,
+        init_db,
+        save_job,
+        is_job_saved,
+        get_job_by_link,
+        get_all_jobs,
+        get_unevaluated_jobs,
+        get_profile,
+        get_messages,
     )
 
     init_db()
@@ -79,7 +85,7 @@ if RUN_DB:
     print(f"Sample job already in DB: {exists}")
 
     # List all jobs with their latest evaluation
-    jobs = get_jobs_with_latest_evaluation()
+    jobs = get_all_jobs()
     print(f"Jobs in DB: {len(jobs)}")
     for j in jobs[:5]:  # show first 5
         score = j.get("score") or "—"
@@ -87,7 +93,9 @@ if RUN_DB:
 
     # Profile and chat history
     profile = get_profile()
-    print(f"\nProfile ({len(profile)} chars): {profile[:100]}{'...' if len(profile) > 100 else ''}")
+    print(
+        f"\nProfile ({len(profile)} chars): {profile[:100]}{'...' if len(profile) > 100 else ''}"
+    )
 
     messages = get_messages()
     print(f"Chat messages in DB: {len(messages)}")
@@ -95,9 +103,9 @@ if RUN_DB:
 
 # ── 3. EVALUATE ──────────────────────────────────────────────────────────────
 if RUN_EVALUATE:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("EVALUATE — evaluate_job (LLM call)")
-    print("="*60)
+    print("=" * 60)
     from src.llm_utils.evaluate import evaluate_job, _build_prompt, profile_hash
 
     # Inspect the prompt without making an LLM call
@@ -116,9 +124,9 @@ if RUN_EVALUATE:
 
 # ── 4. CHAT ──────────────────────────────────────────────────────────────────
 if RUN_CHAT:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("CHAT — chat_reply (LLM call)")
-    print("="*60)
+    print("=" * 60)
     from src.llm_utils.chat import chat_reply
 
     messages = [
@@ -137,15 +145,24 @@ if RUN_CHAT:
 
 # ── 5. PROFILE DISTILL ───────────────────────────────────────────────────────
 if RUN_DISTILL:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("PROFILE DISTILL — distill_profile (LLM call)")
-    print("="*60)
+    print("=" * 60)
     from src.llm_utils.profile import distill_profile
 
     conversation = [
-        {"role": "user", "content": "I really don't want to deal with on-call rotations anymore."},
-        {"role": "assistant", "content": "Noted — I'll factor that in when evaluating ops-heavy roles."},
-        {"role": "user", "content": "Also I'd prefer a company with under 500 people if possible."},
+        {
+            "role": "user",
+            "content": "I really don't want to deal with on-call rotations anymore.",
+        },
+        {
+            "role": "assistant",
+            "content": "Noted — I'll factor that in when evaluating ops-heavy roles.",
+        },
+        {
+            "role": "user",
+            "content": "Also I'd prefer a company with under 500 people if possible.",
+        },
     ]
 
     updated = distill_profile(SAMPLE_PROFILE, conversation)
@@ -155,9 +172,9 @@ if RUN_DISTILL:
 
 # ── 6. FETCHER ───────────────────────────────────────────────────────────────
 if RUN_FETCHER:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("FETCHER — fetch_job_description (Playwright + browser)")
-    print("="*60)
+    print("=" * 60)
     import os
     from playwright.sync_api import sync_playwright
     from src.scraper.fetcher import fetch_job_details
