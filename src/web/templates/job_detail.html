@@ -74,6 +74,12 @@
     <script>(function(){const t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
+    {% if new %}
+    <div style="background: #d1fae5; color: #065f46; border-radius: 6px; padding: 0.5rem 0.9rem; font-size: 0.82rem; margin-bottom: 0.75rem;">
+        Job saved. Evaluate it using the button below.
+    </div>
+    {% endif %}
+
     <nav style="display:flex; gap:1rem; font-size:0.8rem; margin-bottom:0.5rem; align-items:center;">
         <a href="/">← list</a>
         <a href="/chat">chat</a>

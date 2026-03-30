@@ -3,6 +3,7 @@ import os
 import json
 import hashlib
 import importlib
+import re
 from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 
@@ -73,20 +74,22 @@ Respond with JSON only — no markdown wrapper, no text outside the JSON:
 }}"""
 
 
-def _strip_fences(raw: str) -> str:
-    s = raw.strip()
-    if s.startswith("```"):
-        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
-    if s.endswith("```"):
-        s = s.rsplit("```", 1)[0]
-    return s.strip()
-
-
 def _parse_response(raw: str) -> EvaluationResult:
-    try:
-        return EvaluationResult.model_validate(json.loads(_strip_fences(raw)))
-    except (json.JSONDecodeError, ValidationError):
-        return EvaluationResult(score=0, summary="Parse failed.", assessment=raw)
+    candidates = [
+        raw.strip(),
+        # strip markdown fences with optional language tag
+        re.sub(r"^```\w*\n?", "", raw.strip()).rstrip("`").strip(),
+        # extract outermost {...} in case there's surrounding prose
+        raw[raw.find("{") : raw.rfind("}") + 1] if "{" in raw and "}" in raw else "",
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            return EvaluationResult.model_validate(json.loads(candidate))
+        except (json.JSONDecodeError, ValidationError):
+            continue
+    return EvaluationResult(score=0, summary="Parse failed.", assessment=raw)
 
 
 def profile_hash(profile: str) -> str:

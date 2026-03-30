@@ -11,13 +11,13 @@
 
 
 ## Short-term
+- Up arrow key to restore previous input in chat input box
 
 ### Conversations & job-scoped context
 - Named, resumable conversations tied to specific job postings (accessible from job detail page)
 - Persisted job context: store AI insights, user notes, and contacts per job
     - Surface context to LLM during chat
     - Display in job listing/detail views
-
 
 ### Improve UI
 - Better progress/status indication for the manual URL ingestion page. [%2]

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from src.db.database import (
     init_db,
     save_evaluation,
+    save_job_manual,
     get_all_jobs,
     update_job_status,
     get_job,
@@ -90,6 +91,29 @@ def ingest_status(task_id: str):
     return JSONResponse(task)
 
 
+@app.get("/jobs/new", response_class=HTMLResponse)
+def job_new_page(request: Request):
+    return templates.TemplateResponse("job_add.html", {"request": request})
+
+
+@app.post("/jobs/new")
+def job_new_save(
+    job_title: str = Form(...),
+    company: str = Form(...),
+    location: str = Form(...),
+    link: str = Form(""),
+    description: str = Form(""),
+):
+    job_id = save_job_manual(
+        job_title, 
+        company, 
+        location, 
+        link.strip() or None, 
+        description
+    )
+    return RedirectResponse(f"/jobs/{job_id}?new=1", status_code=303)
+
+
 @app.post("/jobs/{job_id}/evaluate")
 def reevaluate(job_id: int):
     job = get_job(job_id)
@@ -126,7 +150,7 @@ def set_status(job_id: int, status: str = Form(...)):
 
 
 @app.get("/jobs/{job_id}", response_class=HTMLResponse)
-def job_detail(request: Request, job_id: int):
+def job_detail(request: Request, job_id: int, new: bool = False):
     job = get_job(job_id)
     if not job:
         raise HTTPException(status_code=404)
@@ -136,6 +160,7 @@ def job_detail(request: Request, job_id: int):
             "request": request,
             "job": job,
             "status_flow": STATUS_FLOW,
+            "new": new,
         },
     )
 

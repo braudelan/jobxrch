@@ -39,7 +39,6 @@ _FAKE_JOBS = [{"id": 1, "job_title": "SWE", "company": "Acme", "score": 8, "stat
 
 
 # --- basic ---
-
 def test_chat_reply_returns_text_from_mock():
     with patch("src.llm_utils.providers.anthropic._get_client", return_value=_mock_client("Here is my advice.")):
         with patch("src.llm_utils.chat.get_all_jobs", return_value=_NO_JOBS):

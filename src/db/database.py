@@ -21,7 +21,7 @@ def init_db() -> None:
                 job_title   TEXT NOT NULL,
                 company     TEXT NOT NULL,
                 location    TEXT NOT NULL,
-                link        TEXT NOT NULL UNIQUE,
+                link        TEXT UNIQUE,
                 description TEXT,
                 source      TEXT NOT NULL,
                 scraped_at  TEXT NOT NULL
@@ -198,6 +198,32 @@ def update_job_metadata(
 def delete_job(job_id: int) -> None:
     with _connect() as conn:
         conn.execute("UPDATE jobs SET deleted = 1 WHERE id = ?", (job_id,))
+
+
+def save_job_manual(
+    job_title: str,
+    company: str,
+    location: str,
+    link: Optional[str],
+    description: str,
+) -> int:
+    """Save a job that the user has manually inputted, rather than scraped from the web. Returns the new job ID."""
+    with _connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO jobs (job_title, company, location, link, description, source, scraped_at)
+            VALUES (?, ?, ?, ?, ?, 'manual', ?)
+        """,
+            (
+                job_title,
+                company,
+                location,
+                link or None,
+                description,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        return cur.lastrowid
 
 
 def save_job(job: dict) -> None:

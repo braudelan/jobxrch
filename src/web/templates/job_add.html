@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Job — jobXrch</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { max-width: 600px; margin: 0 auto; padding: 1.5rem; font-size: 0.85rem; }
+        h2 { margin-bottom: 0.25rem; }
+        .note { color: var(--pico-muted-color); font-size: 0.8rem; margin-bottom: 1.5rem; }
+        textarea { font-family: inherit; font-size: 0.82rem; }
+        .theme-toggle { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 999px; cursor: pointer; font-size: 1rem; padding: 0.25rem 0.6rem; color: var(--pico-muted-color); line-height: 1; }
+        .theme-toggle:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+    </style>
+    <script>(function(){const t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+</head>
+<body>
+    <nav style="display:flex; gap:1rem; font-size:0.8rem; margin-bottom:0.5rem; align-items:center;">
+        <a href="/">← list</a>
+        <button class="theme-toggle" id="theme-toggle" style="margin-left:auto;">☀️</button>
+    </nav>
+
+    <h2>Add Job Manually</h2>
+    <p class="note">Fill in the job details below. Only title, company, and location are required.</p>
+
+    <form method="post" action="/jobs/new">
+        <label>
+            Job Title *
+            <input type="text" name="job_title" placeholder="e.g. Senior Software Engineer" required autofocus>
+        </label>
+        <label>
+            Company *
+            <input type="text" name="company" placeholder="e.g. Acme Corp" required>
+        </label>
+        <label>
+            Location *
+            <input type="text" name="location" placeholder="e.g. Remote, New York NY" required>
+        </label>
+        <label>
+            Link <span style="color: var(--pico-muted-color); font-size: 0.78rem;">(optional)</span>
+            <input type="url" name="link" placeholder="https://...">
+        </label>
+        <label>
+            Job Description <span style="color: var(--pico-muted-color); font-size: 0.78rem;">(optional)</span>
+            <textarea name="description" rows="10" placeholder="Paste the full job description here…"></textarea>
+        </label>
+        <button type="submit">Save job</button>
+    </form>
+
+    <script>
+    (function() {
+        const btn = document.getElementById('theme-toggle');
+        function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); btn.textContent = t === 'dark' ? '☀️' : '🌙'; localStorage.setItem('theme', t); }
+        applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+        btn.addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+    })();
+    </script>
+</body>
+</html>
