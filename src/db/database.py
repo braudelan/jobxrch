@@ -79,6 +79,30 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS cv_versions (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                label      TEXT NOT NULL,
+                content    TEXT NOT NULL,
+                job_id     INTEGER REFERENCES jobs(id),
+                parent_id  INTEGER REFERENCES cv_versions(id),
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS raw_llm_log (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id           TEXT NOT NULL,
+                task_type        TEXT NOT NULL,
+                input_payload    TEXT NOT NULL,
+                output_payload   TEXT NOT NULL,
+                prompt_content   TEXT,
+                model            TEXT NOT NULL,
+                timestamp        TEXT NOT NULL,
+                latency_ms       INTEGER,
+                cost_usd         REAL
+            )
+        """)
         # Seed profile from criteria.txt on first startup
         row = conn.execute("SELECT id FROM user_profile WHERE id = 1").fetchone()
         if row is None and os.path.exists(CRITERIA_PATH):
@@ -287,3 +311,79 @@ def get_messages_since(since_id: int) -> list[dict]:
             (since_id,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def get_all_cv_versions() -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, label, job_id, parent_id, created_at FROM cv_versions ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_cv_version(cv_id: int) -> Optional[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM cv_versions WHERE id = ?", (cv_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_master_cv() -> Optional[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM cv_versions WHERE job_id IS NULL ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def save_cv_version(
+    label: str,
+    content: str,
+    job_id: Optional[int] = None,
+    parent_id: Optional[int] = None,
+) -> int:
+    with _connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO cv_versions (label, content, job_id, parent_id, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (label, content, job_id, parent_id, datetime.now(timezone.utc).isoformat()),
+        )
+        return cur.lastrowid
+
+
+def log_llm_call(
+    run_id: str,
+    task_type: str,
+    input_payload: str,
+    output_payload: str,
+    model: str,
+    prompt_content: Optional[str] = None,
+    latency_ms: Optional[int] = None,
+    cost_usd: Optional[float] = None,
+) -> None:
+    """Log an LLM API call to the raw_llm_log table."""
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO raw_llm_log
+            (run_id, task_type, input_payload, output_payload, prompt_content, model, timestamp, latency_ms, cost_usd)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                run_id,
+                task_type,
+                input_payload,
+                output_payload,
+                prompt_content,
+                model,
+                datetime.now(timezone.utc).isoformat(),
+                latency_ms,
+                cost_usd,
+            ),
+        )
