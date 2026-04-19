@@ -102,11 +102,35 @@ A single document (name TBD — `DEVLOG.md`, `EVOLUTION.md`, or similar) with tw
 - Browser extension as a clip-from-anywhere ingest layer
 - Job age/staleness indicators
 
-### Tracking capabilities
-- Track time-based metrics: application submission dates, response times, interview schedules, and follow-up reminders
+### Job lifecycle management
 
-### Application outcome feedback loop
-Track application outcomes (callbacks, rejections, offers) and feed that data back into profile refinement — so the scoring model learns from real-world signal over time.
+The current model treats jobs as static records with a single overwritten status field. A complete system needs to capture the full lifecycle of an application.
+
+**Timeline / audit trail** — a `job_events` table of timestamped events per job (`saved`, `applied`, `interview_scheduled`, `rejected`, `offer_received`, etc.) rather than a single mutable status. Preserves history, enables time-based metrics: how long between save and apply, how long in progress, when was it rejected.
+
+**Application context** — per-job metadata that doesn't fit the schema: applied via LinkedIn / direct / referral, who referred you, which CV version was sent, cover letter notes.
+
+**Archiving** — distinguish between `deleted` (noise, irrelevant) and `archived` (considered, deliberately parked for later). Archived jobs remain visible but out of the active pipeline.
+
+**Staleness indicators** — surface job age visually. A posting saved 3 months ago with no action is very different from one saved yesterday.
+
+**Pipeline view** — stage-grouped or kanban view of active applications for a scannable overview of the current search state.
+
+---
+
+#### Application response parsing *(grammar component)*
+
+A dedicated LLM operation — `parse_application_response(email_text) → job event` — that reads an email, identifies the job, classifies the event type, and writes a timestamped entry to the job's event timeline.
+
+**What the LLM does** — classification and extraction: is this a rejection, interview request, offer, or generic acknowledgement? What's the next step? When is the interview? Output is a validated structured event, not free text.
+
+**v1 — manual paste** (no OAuth): a "log response" action on the job detail page where you paste email text. LLM classifies and logs the event. Same operation, zero infrastructure risk.
+
+**v2 — Gmail integration**: OAuth connection, polling or push (Gmail pub/sub), automatic ingestion. The hard part is reliable matching — mapping "Senior Engineer at Acme" in an email back to the correct job record when multiple similar jobs may be saved. Privacy note: with a cloud LLM provider, email content leaves the machine.
+
+**Feedback loop** — parsed outcomes (rejections, callbacks, offers) feed back into profile refinement over time. The scoring model learns from real-world signal.
+
+---
 
 ### Tool discoverability
 - **Seed script** (`seed_demo.py`): populate a fresh DB with a realistic profile, 8-10 varied job postings (spanning score range + statuses), evaluations, and a sample chat history — so anyone who clones the repo can immediately see a populated app
