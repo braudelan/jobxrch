@@ -25,3 +25,21 @@ def format_job(job: dict) -> str:
     if job.get("assessment"):
         parts.append(f"\n### AI Assessment\n{job['assessment']}")
     return "\n".join(parts)
+
+
+def format_cv_list(versions: list[dict]) -> str:
+    if not versions:
+        return "No CV versions saved yet."
+    lines = [
+        "| ID | Label | Created | Job ID |",
+        "| --- | --- | --- | --- |",
+    ]
+    for v in versions:
+        job_id = str(v["job_id"]) if v.get("job_id") else "—"
+        lines.append(f"| {v['id']} | {v['label']} | {v['created_at'][:10]} | {job_id} |")
+    return "\n".join(lines)
+
+
+def format_cv(version: dict) -> str:
+    header = f"**CV: {version['label']}** (id: {version['id']}, created: {version['created_at'][:10]})"
+    return f"{header}\n\n{version['content']}"

@@ -2,8 +2,8 @@
 import importlib
 import os
 
-from src.db.database import get_profile, get_all_jobs, get_job
-from src.llm_utils.context import format_job_list, format_job
+from src.db.database import get_profile, get_all_jobs, get_job, get_all_cv_versions, get_cv_version, get_master_cv
+from src.llm_utils.context import format_job_list, format_job, format_cv_list, format_cv
 from src.llm_utils.search import get_search_fn
 
 
@@ -58,6 +58,38 @@ _GET_JOB_DETAILS_TOOL = {
 }
 
 
+_GET_CV_LIST_TOOL = {
+    "name": "get_cv_list",
+    "description": (
+        "List all saved CV versions with their ID, label, creation date, and associated job ID. "
+        "Call this first to identify which CV to use before fetching its content. "
+        "Master CVs have no job ID."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {},
+    },
+}
+
+_GET_CV_DETAILS_TOOL = {
+    "name": "get_cv_details",
+    "description": (
+        "Retrieve the full content of a specific CV version by ID. "
+        "Use get_cv_list first to find the correct ID."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "cv_id": {
+                "type": "integer",
+                "description": "The CV version ID from the CV list.",
+            }
+        },
+        "required": ["cv_id"],
+    },
+}
+
+
 def _load_provider():
     provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
     return importlib.import_module(f"src.llm_utils.providers.{provider_name}")
@@ -93,9 +125,17 @@ def chat_reply(messages: list[dict]) -> str:
         "get_job_details": lambda inp: (
             format_job(j) if (j := get_job(inp["job_id"])) else f"No job found with ID {inp['job_id']}."
         ),
+        "get_cv_list": lambda _inp: format_cv_list(get_all_cv_versions()),
+        "get_cv_details": lambda inp: (
+            format_cv(v) if (v := get_cv_version(inp["cv_id"])) else f"No CV found with ID {inp['cv_id']}."
+        ),
     }
-    tools = [_GET_JOB_LIST_TOOL, _GET_JOB_DETAILS_TOOL]
-    tool_hints = ["Use the get_job_list tool to see the user's saved jobs, and get_job_details to fetch a specific role."]
+    tools = [_GET_JOB_LIST_TOOL, _GET_JOB_DETAILS_TOOL, _GET_CV_LIST_TOOL, _GET_CV_DETAILS_TOOL]
+    tool_hints = [
+        "Always call get_job_list first to get job IDs before calling get_job_details. "
+        "Never assume or guess a job ID — always look it up from the list first. "
+        "Use get_cv_list to see saved CV versions, then get_cv_details to read a specific one."
+    ]
 
     if search_fn:
         tool_handlers["search_web"] = lambda inp: search_fn(inp["query"])
