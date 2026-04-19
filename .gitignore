@@ -45,8 +45,9 @@ wheels/
 .coverage
 htmlcov/
 
-# DB files
-data/jobs.db
+# Data directory — runtime and personal files
+data/*
+!data/.gitkeep
 
 # Claude
 .claude/
