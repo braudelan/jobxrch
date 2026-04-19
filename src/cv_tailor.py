@@ -124,7 +124,9 @@ Return only the completed CV JSON object (valid JSON, no backticks, no markdown)
 # PUBLIC API
 # ============================================================================
 
-def generate_cv_tailor(job_description: str) -> CVTailorResult:
+def generate_cv_tailor(
+    job_description: str, job_id: Optional[int] = None
+) -> CVTailorResult:
     """
     Generate a tailored CV for a specific job description.
 
@@ -132,9 +134,10 @@ def generate_cv_tailor(job_description: str) -> CVTailorResult:
     with LLM-generated content optimized for the job. All generated fields are annotated
     with source_sections referencing the master profile.
 
-    Returns a validated CVTailorResult and logs the call to raw_llm_log.
+    Saves the rendered CV to cv_versions (linked to job_id if provided) and logs the
+    full call to raw_llm_log.
     """
-    from src.db.database import log_llm_call, get_profile
+    from src.db.database import log_llm_call, get_profile, get_job, save_cv_version
 
     run_id = str(uuid.uuid4())
     start_time = time.time()
@@ -158,6 +161,15 @@ def generate_cv_tailor(job_description: str) -> CVTailorResult:
         result = CVTailorResult.model_validate(parsed)
     except Exception as e:
         raise ValueError(f"Failed to parse CV tailor output: {e}\nRaw output:\n{raw_output}")
+
+    # Save rendered CV to cv_versions
+    rendered = render_cv(result)
+    label = "Tailored CV"
+    if job_id:
+        job = get_job(job_id)
+        if job:
+            label = f"{job['company']} — {job['job_title']}"
+    save_cv_version(label, rendered, job_id=job_id)
 
     # Log the call
     log_llm_call(
