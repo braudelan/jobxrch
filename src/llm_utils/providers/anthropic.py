@@ -2,8 +2,9 @@
 import os
 import anthropic
 
-_client = None
 
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+_client = None
 
 def _get_client():
     global _client
@@ -17,7 +18,7 @@ def complete(prompt: str, tools: list = None, tool_handlers: dict = None) -> str
     if tools:
         return _tool_loop([{"role": "user", "content": prompt}], tools, tool_handlers)
     message = _get_client().messages.create(
-        model="claude-sonnet-4-6",
+        model=ANTHROPIC_MODEL,
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -29,7 +30,7 @@ def chat(system: str, messages: list, tools: list = None, tool_handlers: dict = 
     if tools:
         return _tool_loop(messages, tools, tool_handlers, system=system)
     message = _get_client().messages.create(
-        model="claude-sonnet-4-6",
+        model=ANTHROPIC_MODEL,
         max_tokens=2048,
         system=system,
         messages=messages,
@@ -43,7 +44,7 @@ def _tool_loop(messages: list, tools: list, tool_handlers: dict, system: str = N
 
     while True:
         response = _get_client().messages.create(
-            model="claude-sonnet-4-6",
+            model=ANTHROPIC_MODEL,
             max_tokens=2048,
             tools=tools,
             messages=messages,
