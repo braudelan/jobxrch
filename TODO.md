@@ -23,7 +23,29 @@
 
 
 
-## Long term 
+## Long term
+
+### Chat-centric UI redesign
+
+A major shift in the app's design philosophy: the chat interface becomes the primary surface, with the structured grammar operations (evaluate, tailor CV, company overview) surfaced as first-class actions from within it.
+
+**The idea**
+Rather than the current tab-per-feature layout, the chat panel is the center of the page. Grammar operations are invokable from alongside it — as buttons, a command palette, slash commands, or natural language. Results render inline in the chat thread, where they can be immediately discussed or acted on.
+
+**Interaction models to explore**
+- **Hybrid** (preferred direction): explicit action buttons/shortcuts for discoverability, also invokable through chat. The thread becomes a unified history of conversation and operation outputs.
+- **Chat-only**: no buttons — all operations triggered via natural language or slash commands (e.g. `/tailor 42`). Lower UI complexity, higher discoverability barrier.
+- **Chat + action toolbar**: grammar operations live in a persistent toolbar or side panel adjacent to the chat.
+
+**Why this matters**
+The current layout (chat as one tab among many) undersells the grammar framing. Making chat central and operations accessible from it makes the tool's model explicit: these are named, composable operations on your job search data, not isolated pages.
+
+**Open questions**
+- Where does the job list live in this layout?
+- How are operation results persisted and revisitable in the thread?
+- Does each job still have its own detail page, or does that collapse into the chat?
+
+---
 
 ### New features
 
@@ -49,6 +71,20 @@ Tighter system prompt scoped entirely to profile work. The LLM is not a career c
 
 **Relationship to existing code**
 Builds on existing profile storage, the jobs DB, and the web search infrastructure. The specific functions and prompt patterns will be designed for this interface — existing utilities in `profile.py` and `chat.py` are a reference point, not a constraint.
+
+---
+
+#### Company Overview *(grammar component)*
+
+A dedicated LLM operation — `company_overview(company_name, job_description?) → structured brief` — that synthesizes a structured snapshot of a company from web search results. A first-class member of the grammar alongside evaluate, cv_tailor, and chat.
+
+**Output** — validated JSON artifact: what the company does, size/stage, tech stack, culture signals, recent news, potential red flags. Rendered on demand, not free prose.
+
+**How it works** — web search is the primary input. The operation formulates targeted queries, fetches results, and synthesizes them into structure. Builds directly on the existing `search.py` infrastructure.
+
+**Where it surfaces** — no dedicated page needed. Natural fit as an on-demand section on the job detail page, and as a callable tool from chat. Could also be consumed by evaluation (replacing its ad-hoc company search) as a shared upstream artifact.
+
+**Caching** — results should be stored per company with a timestamp so repeated views don't re-fetch. Worth designing for from the start even if deferred.
 
 ---
 
