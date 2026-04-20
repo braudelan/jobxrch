@@ -1,11 +1,10 @@
 # src/llm_utils/evaluate.py
 import os
-import json
 import hashlib
 import importlib
-import re
 from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
+import json_repair
 
 load_dotenv(override=True)
 
@@ -75,20 +74,10 @@ Respond with JSON only — no markdown wrapper, no text outside the JSON:
 
 
 def _parse_response(raw: str) -> EvaluationResult:
-    candidates = [
-        raw.strip(),
-        # strip markdown fences with optional language tag
-        re.sub(r"^```\w*\n?", "", raw.strip()).rstrip("`").strip(),
-        # extract outermost {...} in case there's surrounding prose
-        raw[raw.find("{") : raw.rfind("}") + 1] if "{" in raw and "}" in raw else "",
-    ]
-    for candidate in candidates:
-        if not candidate:
-            continue
-        try:
-            return EvaluationResult.model_validate(json.loads(candidate))
-        except (json.JSONDecodeError, ValidationError):
-            continue
+    try:
+        return EvaluationResult.model_validate(json_repair.loads(raw.strip()))
+    except (ValidationError, Exception):
+        pass
     return EvaluationResult(score=0, summary="Parse failed.", assessment=raw)
 
 
