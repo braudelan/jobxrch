@@ -8,6 +8,7 @@ from src.cv_tailor import (
     SkillCategory,
     Summary,
     _load_cv_template,
+    _parse_output,
 )
 
 
@@ -66,6 +67,70 @@ def sample_cv_result() -> CVTailorResult:
                     ),
                 ],
                 source_sections=["Experience > Weizmann"],
+            ),
+        ],
+        education=template["education"],
+    )
+
+
+@pytest.fixture
+def minimal_cv_result() -> CVTailorResult:
+    """Create a minimal CVTailorResult with only required fields."""
+    template = _load_cv_template()
+    return CVTailorResult(
+        header=template["header"],
+        summary=Summary(text="", source_sections=[]),
+        skills=[],
+        experience=[],
+        education=[],
+    )
+
+
+@pytest.fixture
+def cv_result_no_experience(sample_cv_result) -> CVTailorResult:
+    """Create a CV with no experience entries."""
+    sample_cv_result.experience = []
+    return sample_cv_result
+
+
+@pytest.fixture
+def cv_result_no_skills(sample_cv_result) -> CVTailorResult:
+    """Create a CV with no skills."""
+    sample_cv_result.skills = []
+    return sample_cv_result
+
+
+@pytest.fixture
+def cv_result_with_null_title(sample_cv_result) -> CVTailorResult:
+    """Create a CV where first experience entry has null title."""
+    sample_cv_result.experience[0].title = None
+    return sample_cv_result
+
+
+@pytest.fixture
+def cv_result_single_entry() -> CVTailorResult:
+    """Create a CV with minimal single entries in each section."""
+    template = _load_cv_template()
+    return CVTailorResult(
+        header=template["header"],
+        summary=Summary(text="Professional summary", source_sections=["Summary"]),
+        skills=[
+            SkillCategory(
+                category="Technical", items="Python", source_sections=["Skills"]
+            ),
+        ],
+        experience=[
+            ExperienceEntry(
+                company="TestCorp",
+                title="Engineer",
+                period="2020-2024",
+                tagline="Worked on projects",
+                bullets=[
+                    Bullet(
+                        title="Task", text="Did work", source_sections=["Experience"]
+                    )
+                ],
+                source_sections=["Experience"],
             ),
         ],
         education=template["education"],
@@ -312,3 +377,53 @@ class TestTemplateLoading:
             assert "degree" in edu
             assert "institution" in edu
             assert "year" in edu
+
+
+# --- _parse_output ---
+# TODO: create a class of test cases for _parse_output, including valid JSON, invalid JSON, truncated JSON, missing fields, etc.
+
+@pytest.fixture
+def valid_cv_json():
+    return """{
+  "header": {"name": "Jane Doe"},
+  "summary": {"text": "Experienced engineer.", "source_sections": ["Summary"]},
+  "skills": [{"category": "Languages", "items": "Python, Go", "source_sections": ["Skills"]}],
+  "experience": [{
+    "company": "Acme", "title": "Engineer", "period": "2020-2024",
+    "tagline": "Built things",
+    "bullets": [{"title": "Impact", "text": "Did stuff", "source_sections": ["Experience"]}],
+    "source_sections": ["Experience"]
+  }],
+  "education": [{"degree": "BSc Computer Science"}]
+}"""
+
+
+def test_parse_output_valid_json(valid_cv_json):
+    result = _parse_output(valid_cv_json)
+    assert isinstance(result, CVTailorResult)
+    assert result.summary.text == "Experienced engineer."
+    assert result.skills[0].category == "Languages"
+
+
+def test_parse_output_fenced_json(valid_cv_json):
+    result = _parse_output(f"```json\n{valid_cv_json}\n```")
+    assert result.summary.text == "Experienced engineer."
+
+
+def test_parse_output_unterminated_string(valid_cv_json):
+    # Simulate the real failure mode: LLM response cut off mid-string at the end
+    # All required fields are present; only the closing quote/braces are missing
+    truncated = valid_cv_json[:-5]  # cuts off inside "BSc Computer Science"}]\n}
+    result = _parse_output(truncated)
+    assert isinstance(result, CVTailorResult)
+
+
+def test_parse_output_missing_required_field():
+    raw = '{"header": {"name": "Jane"}, "summary": {"text": "ok", "source_sections": []}}'
+    with pytest.raises(ValueError, match="Failed to parse CV tailor output"):
+        _parse_output(raw)
+
+
+def test_parse_output_not_json():
+    with pytest.raises(ValueError, match="Failed to parse CV tailor output"):
+        _parse_output("Here is your tailored CV in plain text, no JSON.")

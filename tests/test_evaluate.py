@@ -1,34 +1,11 @@
-import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
 import json
 import pytest
 from unittest.mock import patch, MagicMock
 
 from src.llm_utils.evaluate import (
-    _strip_fences, _parse_response, _build_prompt, profile_hash, evaluate_job,
+    _parse_response, _build_prompt, profile_hash, evaluate_job,
     EvaluationResult,
 )
-
-
-# --- _strip_fences ---
-
-def test_strip_fences_plain_json():
-    raw = '{"score": 7, "summary": "ok", "assessment": "good"}'
-    assert _strip_fences(raw) == raw
-
-
-def test_strip_fences_json_fences():
-    raw = '```json\n{"score": 7, "summary": "ok", "assessment": "good"}\n```'
-    result = _strip_fences(raw)
-    assert result == '{"score": 7, "summary": "ok", "assessment": "good"}'
-
-
-def test_strip_fences_plain_fences():
-    raw = '```\n{"score": 5, "summary": "mid", "assessment": "fine"}\n```'
-    result = _strip_fences(raw)
-    assert result == '{"score": 5, "summary": "mid", "assessment": "fine"}'
 
 
 # --- _parse_response ---

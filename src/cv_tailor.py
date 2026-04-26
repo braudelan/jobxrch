@@ -1,6 +1,7 @@
 # src/cv_tailor.py
 import os
 import json
+import json_repair
 import time
 import uuid
 import importlib
@@ -51,6 +52,13 @@ class CVTailorResult(BaseModel):
 # ============================================================================
 # UTILITIES
 # ============================================================================
+
+def _parse_output(raw: str) -> CVTailorResult:
+    try:
+        return CVTailorResult.model_validate(json_repair.loads(raw.strip()))
+    except Exception as e:
+        raise ValueError(f"Failed to parse CV tailor output: {e}\nRaw output:\n{raw}")
+
 
 def _load_provider():
     provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
@@ -156,11 +164,7 @@ def generate_cv_tailor(
     latency_ms = int((time.time() - start_time) * 1000)
 
     # Parse and validate
-    try:
-        parsed = json.loads(raw_output)
-        result = CVTailorResult.model_validate(parsed)
-    except Exception as e:
-        raise ValueError(f"Failed to parse CV tailor output: {e}\nRaw output:\n{raw_output}")
+    result = _parse_output(raw_output)
 
     # Save rendered CV to cv_versions
     rendered = render_cv(result)

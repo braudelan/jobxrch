@@ -98,6 +98,18 @@ A dedicated LLM operation — `company_overview(company_name, job_description?) 
 ### Project evolution document
 A single document (name TBD — `DEVLOG.md`, `EVOLUTION.md`, or similar) with two sections: "Current State" (updated in place, deeper than README — captures *why* things are the way they are) and "Decision Log" (append-only, newest first — architectural, philosophical, and major implementation shifts). Audience: personal reference and GitHub readers who want to follow the project's evolution.
 
+### Manual job ordering and priority override
+
+Two complementary ways for the user to assert their own judgment over the job list ranking:
+
+**Manual reorder** — drag-and-drop (or up/down controls) to set an explicit `sort_order` on jobs. Once any manual ordering exists, it takes precedence over LLM-score-based sorting. New jobs (null `sort_order`) appear at the top so the user can slot them in.
+
+**Score override** — an inline editable field on the score badge in the list and detail views. The user's score replaces the LLM score for display and sorting purposes without deleting the original evaluation. Stored as `score_override` on the job.
+
+**Why this matters** — LLM scores reflect profile fit, but the user has context the model doesn't: insider knowledge of a company, a referral, or a gut feeling. The list should be theirs to shape.
+
+---
+
 ### Misc.
 - Browser extension as a clip-from-anywhere ingest layer
 - Job age/staleness indicators
