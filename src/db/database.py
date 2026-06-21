@@ -129,9 +129,18 @@ def init_db() -> None:
             )
 
 
-def is_job_saved(link: str) -> bool:
+def is_job_saved(job: dict) -> bool:
+    link = job.get("link")
     with _connect() as conn:
-        row = conn.execute("SELECT 1 FROM jobs WHERE link = ?", (link,)).fetchone()
+        if link and link != "N/A":
+            row = conn.execute("SELECT 1 FROM jobs WHERE link = ?", (link,)).fetchone()
+        else:
+            row = conn.execute(
+                """SELECT 1 FROM jobs
+                   WHERE LOWER(TRIM(job_title)) = LOWER(TRIM(?))
+                     AND LOWER(TRIM(company))   = LOWER(TRIM(?))""",
+                (job.get("job_title", ""), job.get("company", "")),
+            ).fetchone()
         return row is not None
 
 

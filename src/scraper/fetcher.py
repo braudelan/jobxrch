@@ -121,7 +121,7 @@ def ingest_job_from_url(session_dir: str, url: str) -> int:
             user_data_dir=session_dir,
             headless=False,
         )
-        if not is_job_saved(url):
+        if not is_job_saved({"link": url}):
             details = fetch_job_details(context, url)
             save_job(
                 {

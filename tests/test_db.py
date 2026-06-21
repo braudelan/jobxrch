@@ -61,14 +61,20 @@ def test_save_job_without_description():
     assert desc is None
 # --- is_job_saved ---
 def test_is_job_saved_returns_false_when_not_in_db():
-    assert is_job_saved("https://www.linkedin.com/jobs/view/999/") is False
+    assert is_job_saved({"link": "https://www.linkedin.com/jobs/view/999/"}) is False
 def test_is_job_saved_returns_true_after_save():
     job = _sample_job()
     save_job(job)
-    assert is_job_saved(job["link"]) is True
+    assert is_job_saved({"link": job["link"]}) is True
 def test_is_job_saved_does_not_match_partial_link():
     save_job(_sample_job(link="https://www.linkedin.com/jobs/view/123/"))
-    assert is_job_saved("https://www.linkedin.com/jobs/view/12/") is False
+    assert is_job_saved({"link": "https://www.linkedin.com/jobs/view/12/"}) is False
+def test_is_job_saved_falls_back_to_title_company():
+    save_job(_sample_job(link="N/A"))
+    assert is_job_saved({"link": "N/A", "job_title": "Data Analyst", "company": "Acme Corp"}) is True
+def test_is_job_saved_title_company_case_insensitive():
+    save_job(_sample_job(link="N/A"))
+    assert is_job_saved({"link": "N/A", "job_title": "data analyst", "company": "acme corp"}) is True
 # --- Migration ---
 # --- profile ---
 def test_get_profile_empty():

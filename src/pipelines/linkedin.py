@@ -28,7 +28,7 @@ def run():
         jobs = scrape_all_saved_jobs(page)
         print(f"Found {len(jobs)} saved jobs.")
 
-        new_jobs = [job for job in jobs if not is_job_saved(job["link"])]
+        new_jobs = [job for job in jobs if not is_job_saved(job)]
         print(f"{len(new_jobs)} new jobs to fetch. {len(jobs) - len(new_jobs)} already in DB, skipping.")
 
         for i, job in enumerate(new_jobs, 1):
