@@ -38,11 +38,14 @@ def chat(system: str, messages: list, tools: list = None, tool_handlers: dict = 
     return message.content[0].text
 
 
+_MAX_TOOL_ITERATIONS = 10
+
+
 def _tool_loop(messages: list, tools: list, tool_handlers: dict, system: str = None) -> str:
     """Agentic tool-use loop. Returns the final text reply."""
     kwargs = {"system": system} if system else {}
 
-    while True:
+    for _ in range(_MAX_TOOL_ITERATIONS):
         response = _get_client().messages.create(
             model=ANTHROPIC_MODEL,
             max_tokens=2048,
@@ -70,5 +73,7 @@ def _tool_loop(messages: list, tools: list, tool_handlers: dict, system: str = N
             {"role": "assistant", "content": response.content},
             {"role": "user", "content": tool_results},
         ]
+
+    return "[Error: tool loop exceeded max iterations]"
 
 
