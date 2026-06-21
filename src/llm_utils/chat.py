@@ -5,6 +5,7 @@ import os
 from src.db.database import get_profile, get_all_jobs, get_job, get_all_cv_versions, get_cv_version, get_master_cv
 from src.llm_utils.context import format_job_list, format_job, format_cv_list, format_cv
 from src.llm_utils.search import get_search_fn
+from src.cv_tailor import generate_cv_tailor
 
 
 _SEARCH_WEB_TOOL = {
@@ -89,6 +90,26 @@ _GET_CV_DETAILS_TOOL = {
     },
 }
 
+_TAILOR_CV_TOOL = {
+    "name": "tailor_cv",
+    "description": (
+        "Generate a tailored CV for a specific job. "
+        "Rewrites the candidate's CV to highlight the most relevant experience and skills for that role. "
+        "Use this when the user asks to tailor, customise, or prepare their CV for a job. "
+        "Call get_job_list first if you need to look up the job ID."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "job_id": {
+                "type": "integer",
+                "description": "The job ID to tailor the CV for.",
+            }
+        },
+        "required": ["job_id"],
+    },
+}
+
 
 def _load_provider():
     provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
@@ -120,6 +141,14 @@ def chat_reply(messages: list[dict]) -> str:
     profile = get_profile()
     search_fn = get_search_fn()
 
+    def _handle_tailor_cv(inp: dict) -> str:
+        job_id = inp["job_id"]
+        job = get_job(job_id)
+        if not job:
+            return f"No job found with ID {job_id}."
+        _, cv_id = generate_cv_tailor(job["description"], job_id=job_id)
+        return f"cv_id:{cv_id}"
+
     tool_handlers = {
         "get_job_list": lambda _inp: format_job_list(get_all_jobs()),
         "get_job_details": lambda inp: (
@@ -129,12 +158,14 @@ def chat_reply(messages: list[dict]) -> str:
         "get_cv_details": lambda inp: (
             format_cv(v) if (v := get_cv_version(inp["cv_id"])) else f"No CV found with ID {inp['cv_id']}."
         ),
+        "tailor_cv": _handle_tailor_cv,
     }
-    tools = [_GET_JOB_LIST_TOOL, _GET_JOB_DETAILS_TOOL, _GET_CV_LIST_TOOL, _GET_CV_DETAILS_TOOL]
+    tools = [_GET_JOB_LIST_TOOL, _GET_JOB_DETAILS_TOOL, _GET_CV_LIST_TOOL, _GET_CV_DETAILS_TOOL, _TAILOR_CV_TOOL]
     tool_hints = [
-        "Always call get_job_list first to get job IDs before calling get_job_details. "
+        "Always call get_job_list first to get job IDs before calling get_job_details or tailor_cv. "
         "Never assume or guess a job ID — always look it up from the list first. "
-        "Use get_cv_list to see saved CV versions, then get_cv_details to read a specific one."
+        "Use get_cv_list to see saved CV versions, then get_cv_details to read a specific one. "
+        "When tailor_cv succeeds it returns 'cv_id:<number>'. Always include the link /cv/<number> in your reply so the user can view their tailored CV."
     ]
 
     if search_fn:

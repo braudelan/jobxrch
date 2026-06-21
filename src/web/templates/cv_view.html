@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ cv.label }} — CV</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { max-width: 860px; margin: 0 auto; padding: 1.5rem; font-size: 0.85rem; }
+
+        nav { display: flex; gap: 1rem; font-size: 0.8rem; margin-bottom: 1rem; align-items: center; }
+        nav a { color: var(--pico-muted-color); text-decoration: none; }
+        nav a:hover { color: var(--pico-primary); }
+
+        .meta { color: var(--pico-muted-color); font-size: 0.75rem; margin-bottom: 1.5rem; }
+        .meta span + span::before { content: " · "; }
+
+        .theme-toggle { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 999px; cursor: pointer; font-size: 1rem; padding: 0.25rem 0.6rem; color: var(--pico-muted-color); line-height: 1; margin-left: auto; }
+        .theme-toggle:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+
+        .cv-body { line-height: 1.6; }
+        .cv-body h1 { font-size: 1.5rem; margin-bottom: 0.1rem; }
+        .cv-body h2 { font-size: 1rem; border-bottom: 1px solid var(--pico-muted-border-color); padding-bottom: 0.2rem; margin-top: 1.25rem; }
+        .cv-body h3 { font-size: 0.9rem; margin-bottom: 0.1rem; }
+        .cv-body ul { padding-left: 1.25rem; margin: 0.25rem 0; }
+        .cv-body p { margin: 0.3rem 0; }
+        .cv-body em { color: var(--pico-muted-color); }
+    </style>
+    <script>(function(){const t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+</head>
+<body>
+    <nav>
+        {% if job %}
+        <a href="/jobs/{{ job.id }}">← {{ job.company }} — {{ job.job_title }}</a>
+        {% else %}
+        <a href="/">← list</a>
+        {% endif %}
+        <a href="/chat">chat</a>
+        <button class="theme-toggle" id="theme-toggle">☀️</button>
+    </nav>
+
+    <p class="meta">
+        <span>{{ cv.label }}</span>
+        <span>{{ cv.created_at[:10] }}</span>
+    </p>
+
+    <div class="cv-body" id="cv-body"></div>
+
+    <script>
+    document.getElementById('cv-body').innerHTML = marked.parse({{ cv.content | tojson }});
+
+    (function() {
+        const btn = document.getElementById('theme-toggle');
+        function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); btn.textContent = t === 'dark' ? '☀️' : '🌙'; localStorage.setItem('theme', t); }
+        applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
+        btn.addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+    })();
+    </script>
+</body>
+</html>

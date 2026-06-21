@@ -134,7 +134,7 @@ Return only the completed CV JSON object (valid JSON, no backticks, no markdown)
 
 def generate_cv_tailor(
     job_description: str, job_id: Optional[int] = None
-) -> CVTailorResult:
+) -> tuple[CVTailorResult, int]:
     """
     Generate a tailored CV for a specific job description.
 
@@ -173,7 +173,7 @@ def generate_cv_tailor(
         job = get_job(job_id)
         if job:
             label = f"{job['company']} — {job['job_title']}"
-    save_cv_version(label, rendered, job_id=job_id)
+    cv_id = save_cv_version(label, rendered, job_id=job_id)
 
     # Log the call
     log_llm_call(
@@ -191,7 +191,7 @@ def generate_cv_tailor(
         latency_ms=latency_ms,
     )
 
-    return result
+    return result, cv_id
 
 
 def render_cv(result: CVTailorResult) -> str:

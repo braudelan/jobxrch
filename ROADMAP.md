@@ -2,14 +2,21 @@
 
 ## Inbox
 
+- **Deletion note capture** — when a job is deleted, prompt for an optional reason (noise, already applied, position filled, etc.) stored alongside the event so the decision can be retrospectively understood.
+- **Time-in-status indicator** — each job in the list should show how long it has been in its current status (e.g. "applied · 3 weeks"). This is the primary signal for identifying stale applications and should be visually scannable without cluttering the default view.
+- **Stale job removal** — when a job has been in a status (e.g. applied) past a configurable threshold with no activity, it should be surfaced for removal. Auto-removal after N days is one option; manual removal prompted by a staleness nudge is another. Either way, removal captures a note — auto-generated ("no response after 60 days") or user-provided — so the history is preserved even after the job leaves the active list. The distinction between "they rejected me", "I passed", "they ghosted" lives in that note, not in separate status types.
+- **List view filtering** — default view should show only saved (not-yet-acted-on) jobs. Add quick-filter affordances: one-click presets for common views ("Applied", "In progress"), and score threshold filtering ("score ≥ 6"). Presets and active filters should be visually obvious and easy to clear.
+- **Notes/event history view per job** — `job_events` already captures notes and status changes with timestamps, but nothing reads them back. Need a UI on the job detail page that renders the full event timeline (status transitions + notes in chronological order). Data is there; it's just invisible.
+- **Manual score adjustment** — inline editable score on the job list and detail views, with an optional note field to record why the user's judgment diverges from the LLM score (referral, inside knowledge, gut feel).
+
 ## Short-term
 
 ### Improve UI/UX
-- Tool call visibility in chat: lightweight inline indicators showing what the LLM is doing in the background — e.g. "Fetched job: Senior Engineer at Stripe", "Listed all CV versions". Not verbose, just the main operations as they happen.
+- **Tool call visibility in chat**: lightweight inline indicators showing what the LLM is doing in the background — e.g. "Fetched job: Senior Engineer at Stripe", "Listed all CV versions". Not verbose, just the main operations as they happen.
 - Up arrow key to restore previous input in chat input box
-- Better progress/status indication for the manual URL ingestion page.
-- Thinking indication for chat.
-- Control model choice from chat.
+- **Better progress/status indication** for the manual URL ingestion page.
+- **Thinking indication for chat**.
+- **Control model choice from chat**.
 
 ### App module structure
 - A dedicated module for tool definitions - `_SEARCH_WEB_TOOL`, `_GET_JOB_DETAILS_TOOL`. These can then be imported into the chat.py,
@@ -113,6 +120,7 @@ Two complementary ways for the user to assert their own judgment over the job li
 ### Misc.
 - Browser extension as a clip-from-anywhere ingest layer
 - Job age/staleness indicators
+
 
 ### Job lifecycle management
 

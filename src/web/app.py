@@ -12,6 +12,7 @@ from src.db.database import (
     save_job_manual,
     get_all_jobs,
     update_job_status,
+    log_job_event,
     get_job,
     delete_job,
     update_job_metadata,
@@ -20,11 +21,14 @@ from src.db.database import (
     get_profile_updated_at,
     save_message,
     get_messages,
+    get_cv_version,
+    get_job_cv_versions,
 )
 from src.scraper.fetcher import ingest_job_from_url
 from src.llm_utils.evaluate import evaluate_job
 from src.llm_utils.chat import chat_reply
 from src.llm_utils.profile import distill_profile
+from src.cv_tailor import generate_cv_tailor
 
 SESSION_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".session")
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
@@ -36,6 +40,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 ingest_tasks: dict[str, dict] = {}
+tailor_tasks: dict[str, dict] = {}
 
 
 @app.on_event("startup")
@@ -144,8 +149,8 @@ def job_edit_save(
 
 
 @app.post("/jobs/{job_id}/status")
-def set_status(job_id: int, status: str = Form(...)):
-    update_job_status(job_id, status)
+def set_status(job_id: int, status: str = Form(...), note: str = Form("")):
+    update_job_status(job_id, status, note.strip() or None)
     return RedirectResponse("/", status_code=303)
 
 
@@ -161,14 +166,70 @@ def job_detail(request: Request, job_id: int, new: bool = False):
             "job": job,
             "status_flow": STATUS_FLOW,
             "new": new,
+            "cv_versions": get_job_cv_versions(job_id),
         },
     )
+
+
+@app.post("/jobs/{job_id}/note")
+def add_note(job_id: int, note: str = Form(...)):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404)
+    note = note.strip()
+    if not note:
+        raise HTTPException(status_code=400, detail="Note cannot be empty")
+    log_job_event(job_id, "note", note)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/jobs/{job_id}/delete")
 def delete(job_id: int):
     delete_job(job_id)
     return RedirectResponse("/", status_code=303)
+
+
+# --- CV Tailor ---
+
+
+def _run_tailor(task_id: str, job_id: int) -> None:
+    try:
+        job = get_job(job_id)
+        if not job:
+            tailor_tasks[task_id] = {"status": "error", "message": f"Job {job_id} not found."}
+            return
+        _, cv_id = generate_cv_tailor(job["description"], job_id=job_id)
+        tailor_tasks[task_id] = {"status": "done", "cv_id": cv_id}
+    except BaseException as e:
+        tailor_tasks[task_id] = {"status": "error", "message": f"{type(e).__name__}: {e}"}
+
+
+@app.post("/jobs/{job_id}/tailor")
+def tailor_cv(job_id: int):
+    task_id = str(uuid.uuid4())
+    tailor_tasks[task_id] = {"status": "pending"}
+    threading.Thread(target=_run_tailor, args=(task_id, job_id), daemon=True).start()
+    return JSONResponse({"task_id": task_id})
+
+
+@app.get("/jobs/{job_id}/tailor/status/{task_id}")
+def tailor_status(job_id: int, task_id: str):
+    task = tailor_tasks.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return JSONResponse(task)
+
+
+@app.get("/cv/{cv_id}", response_class=HTMLResponse)
+def cv_view(request: Request, cv_id: int):
+    cv = get_cv_version(cv_id)
+    if not cv:
+        raise HTTPException(status_code=404)
+    job = get_job(cv["job_id"]) if cv.get("job_id") else None
+    return templates.TemplateResponse(
+        "cv_view.html",
+        {"request": request, "cv": cv, "job": job},
+    )
 
 
 # --- Chat ---

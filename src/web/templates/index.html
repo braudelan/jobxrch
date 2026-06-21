@@ -5,54 +5,202 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>jobXrch</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script>(function(){const s=localStorage.getItem('theme');if(s)document.documentElement.setAttribute('data-theme',s);})();</script>
     <style>
-        body { max-width: 1600px; margin: 0 auto; padding: 1rem; font-size: 0.82rem; }
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; padding: 0; }
+        body { font-size: 0.82rem; }
 
-        /* Layout */
-        .layout { display: flex; gap: 0; align-items: flex-start; }
-        .sidebar-wrap { flex-shrink: 0; position: sticky; top: 1rem; }
-        .sidebar { width: 200px; padding-right: 1rem; overflow: hidden; transition: width 0.2s, padding 0.2s; }
-        .sidebar.collapsed { width: 0; padding-right: 0; }
-        .sidebar section { margin-bottom: 1.25rem; }
-        .sidebar section h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pico-muted-color); margin-bottom: 0.5rem; }
-        .sidebar input, .sidebar button { font-size: 0.8rem; }
-        .toggle-btn { background: none; border: none; cursor: pointer; color: var(--pico-muted-color); font-size: 1rem; padding: 0.2rem 0.4rem; margin-bottom: 0.5rem; line-height: 1; }
-        .toggle-btn:hover { color: var(--pico-color); }
-        .main { flex: 1; min-width: 0; }
+        /* ── Shell ─────────────────────────────────────────── */
+        .app { display: flex; height: 100vh; overflow: hidden; }
 
-        /* Score */
-        .score { font-weight: bold; font-size: 0.9rem; }
+        /* ── Sidebar ────────────────────────────────────────── */
+        .sidebar {
+            width: 76px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1.25rem 0 1.25rem;
+            border-right: 1px solid var(--pico-muted-border-color);
+            gap: 0.1rem;
+        }
+
+        .sidebar-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.22rem;
+            padding: 0.5rem 0.3rem;
+            border-radius: 7px;
+            text-decoration: none;
+            color: var(--pico-muted-color);
+            font-size: 0.6rem;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+            width: 60px;
+            text-align: center;
+            cursor: pointer;
+            background: none;
+            border: none;
+            transition: color 0.14s, background 0.14s;
+            line-height: 1;
+        }
+        .sidebar-item:hover {
+            color: var(--pico-primary);
+            background: color-mix(in srgb, var(--pico-primary) 8%, transparent);
+            text-decoration: none;
+        }
+        .sidebar-item svg {
+            width: 17px;
+            height: 17px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.75;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            flex-shrink: 0;
+        }
+
+        .sidebar-divider {
+            width: 32px;
+            border: none;
+            border-top: 1px solid var(--pico-muted-border-color);
+            margin: 0.5rem 0;
+        }
+
+        .sidebar-spacer { flex: 1; }
+
+        /* ── Main ───────────────────────────────────────────── */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 2rem 2rem;
+            min-width: 0;
+        }
+
+        /* ── Page logo ──────────────────────────────────────── */
+        .page-logo {
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, var(--pico-primary) 0%, #346cdb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            user-select: none;
+            line-height: 1;
+            display: block;
+            margin-bottom: 1.25rem;
+        }
+
+        /* ── Filter pills ───────────────────────────────────── */
+        .filter-row {
+            display: flex;
+            gap: 0.35rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .pill {
+            background: none;
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 999px;
+            padding: 0.18rem 0.7rem;
+            font-size: 0.7rem;
+            cursor: pointer;
+            color: var(--pico-muted-color);
+            transition: all 0.13s;
+            font-weight: 500;
+        }
+        .pill.active { background: var(--pico-primary); border-color: var(--pico-primary); color: #fff; }
+        .pill:hover:not(.active) { border-color: var(--pico-primary); color: var(--pico-primary); }
+
+        /* ── Table ──────────────────────────────────────────── */
+        table {
+            table-layout: fixed;
+            width: 100%;
+            font-size: 0.8rem;
+            border-collapse: collapse;
+        }
+        thead th {
+            white-space: nowrap;
+            font-size: 0.67rem;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--pico-muted-color);
+            user-select: none;
+            padding: 0 0.5rem 0.55rem;
+            text-align: left;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+        thead th[data-sort] { cursor: pointer; }
+        thead th[data-sort]:hover { color: var(--pico-primary); }
+        thead th.sort-asc::after  { content: " ▲"; font-size: 0.58rem; }
+        thead th.sort-desc::after { content: " ▼"; font-size: 0.58rem; }
+        thead th.col-score { text-align: center; }
+
+        col.col-company { width: 140px; }
+        col.col-title   { width: 200px; }
+        col.col-note    { width: 38px; }
+        col.col-status  { width: 155px; }
+        col.col-score   { width: 58px; }
+        col.col-edit    { width: 36px; }
+        col.col-delete  { width: 36px; }
+
+        td {
+            vertical-align: top;
+            padding: 0.42rem 0.5rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+
+        .job-row { cursor: pointer; }
+        .job-row:hover td { background: color-mix(in srgb, var(--pico-primary) 4%, transparent); }
+        .job-row.expanded td { background: color-mix(in srgb, var(--pico-primary) 5%, transparent); }
+
+        /* ── Expand row ─────────────────────────────────────── */
+        .expand-row { display: none; }
+        .expand-row.open { display: table-row; }
+        .expand-row td {
+            padding: 0 0.5rem 0.65rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+            background: none !important;
+        }
+        .expand-content {
+            font-size: 0.79rem;
+            line-height: 1.55;
+            color: var(--pico-color);
+            border-left: 2px solid var(--pico-primary);
+            padding: 0.55rem 0.75rem;
+            border-radius: 0 4px 4px 0;
+            background: color-mix(in srgb, var(--pico-primary) 4%, transparent);
+        }
+
+        /* ── Meta / typography ──────────────────────────────── */
+        .meta { color: var(--pico-muted-color); font-size: 0.71rem; display: block; margin-top: 0.1rem; }
+        .job-title-link {
+            color: var(--pico-color);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.8rem;
+        }
+        .job-title-link:hover { color: var(--pico-primary); }
+
+        /* ── Score ──────────────────────────────────────────── */
+        .score { font-weight: 700; font-size: 0.88rem; display: block; text-align: center; }
         .score-high { color: #2a9d5c; }
         .score-mid  { color: #e8a020; }
         .score-low  { color: #c0392b; }
 
-        /* Meta text */
-        .meta { color: var(--pico-muted-color); font-size: 0.75rem; }
-
-        /* Expandable text */
-        .expandable details { margin-top: 0.2rem; }
-        .expandable summary { cursor: pointer; font-size: 0.72rem; color: var(--pico-muted-color); list-style: none; }
-        .expandable summary::before { content: "▶ show more"; }
-        .expandable details[open] summary::before { content: "▲ show less"; }
-        .expandable .preview { font-size: 0.8rem; }
-        .expandable .full-text {
-            font-size: 0.78rem;
-            white-space: pre-wrap;
-            margin-top: 0.4rem;
-            max-height: 300px;
-            overflow-y: auto;
-            border-left: 2px solid var(--pico-muted-border-color);
-            padding-left: 0.6rem;
-        }
-
-        /* Status badges */
+        /* ── Status ─────────────────────────────────────────── */
         .status-badge {
             display: inline-block;
-            padding: 0.1rem 0.4rem;
+            padding: 0.1rem 0.42rem;
             border-radius: 4px;
-            font-size: 0.72rem;
+            font-size: 0.67rem;
             font-weight: 600;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.22rem;
         }
         .status-saved      { background: #e8e8e8; color: #555; }
         .status-applied    { background: #dbeafe; color: #1d4ed8; }
@@ -60,306 +208,415 @@
         .status-offer      { background: #d1fae5; color: #065f46; }
         .status-rejected   { background: #fee2e2; color: #991b1b; }
 
-        /* Status form */
-        .status-form { display: flex; gap: 0.25rem; align-items: center; margin: 0; }
-        .status-form select { font-size: 0.72rem; padding: 0.15rem 0.3rem; margin: 0; height: auto; }
-
-        /* Filter pills */
-        .filter-pills { display: flex; gap: 0.4rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-        .pill { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 999px; padding: 0.2rem 0.75rem; font-size: 0.75rem; cursor: pointer; color: var(--pico-muted-color); }
-        .pill.active { background: var(--pico-primary); border-color: var(--pico-primary); color: #fff; }
-        .pill:hover:not(.active) { border-color: var(--pico-primary); color: var(--pico-primary); }
-
-        /* Table layout */
-        table { table-layout: fixed; width: 100%; font-size: 0.8rem; }
-        th:nth-child(1) { width: 200px; }  /* Title */
-        th:nth-child(2) { width: 140px; }  /* Company */
-        th:nth-child(3) { }                /* Summary (flex) */
-        th:nth-child(4) { width: 60px; }   /* Score */
-        th:nth-child(5) { width: 130px; }  /* Status */
-        th:nth-child(6) { width: 80px; }   /* Actions */
-        .row-actions { display: flex; gap: 0.25rem; }
-        .btn-sm { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 4px; font-size: 0.7rem; padding: 0.15rem 0.4rem; cursor: pointer; color: var(--pico-muted-color); line-height: 1.4; }
-        .btn-sm:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
-        .btn-sm.danger:hover { border-color: #c0392b; color: #c0392b; }
-        th { white-space: nowrap; font-size: 0.75rem; cursor: pointer; user-select: none; }
-        th:hover { color: var(--pico-primary); }
-        th.sort-asc::after  { content: " ▲"; font-size: 0.65rem; }
-        th.sort-desc::after { content: " ▼"; font-size: 0.65rem; }
-        td { vertical-align: top; padding-top: 0.4rem; padding-bottom: 0.4rem; }
-
-        /* Header */
-        .site-header { display: flex; align-items: center; justify-content: space-between; padding: 1.5rem 0 1rem; }
-        .site-header h1 {
-            font-size: 2.5rem;
-            font-weight: 750;
-            letter-spacing: -0.03em;
-            background: linear-gradient(135deg, var(--pico-primary) 0%, #346cdb 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin: 0;
-        }
-
-        /* Theme toggle */
-        .theme-toggle {
-            background: none;
-            border: 1px solid var(--pico-muted-border-color);
-            border-radius: 999px;
-            cursor: pointer;
-            font-size: 1rem;
-            padding: 0.25rem 0.6rem;
-            color: var(--pico-muted-color);
-            line-height: 1;
-            transition: border-color 0.15s, color 0.15s;
-        }
-        .theme-toggle:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
-
-        /* Dark mode badge overrides */
         [data-theme="dark"] .status-saved      { background: #2a2a2a; color: #aaa; }
         [data-theme="dark"] .status-applied    { background: #1e3a5f; color: #93c5fd; }
         [data-theme="dark"] .status-in-process { background: #3d2e00; color: #fcd34d; }
         [data-theme="dark"] .status-offer      { background: #0d3321; color: #6ee7b7; }
         [data-theme="dark"] .status-rejected   { background: #3b1010; color: #fca5a5; }
-    </style>
 
-    <script>
-        // Apply saved theme before first paint to avoid flash
-        (function() {
-            const saved = localStorage.getItem('theme');
-            if (saved) document.documentElement.setAttribute('data-theme', saved);
-        })();
-    </script>
+        .status-form { display: flex; flex-wrap: wrap; gap: 0.18rem; align-items: center; margin: 0; }
+        .status-form select { font-size: 0.67rem; padding: 0.1rem 0.22rem; margin: 0; height: auto; }
+
+        /* ── Action cells ───────────────────────────────────── */
+        .btn-sm {
+            background: none;
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 4px;
+            font-size: 0.72rem;
+            padding: 0.14rem 0.38rem;
+            cursor: pointer;
+            color: var(--pico-muted-color);
+            line-height: 1.4;
+            transition: border-color 0.13s, color 0.13s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-sm:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+        .btn-sm.danger:hover { border-color: #c0392b; color: #c0392b; }
+
+        /* ── Modals ─────────────────────────────────────────── */
+        dialog {
+            border: none;
+            border-radius: 9px;
+            padding: 1.5rem;
+            width: 330px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.16);
+        }
+        dialog::backdrop { background: rgba(0,0,0,0.32); }
+        dialog h4 { margin: 0 0 1rem; font-size: 0.95rem; }
+        .modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.85rem; }
+        #status-modal input { width: 100%; margin-bottom: 0; }
+        [data-theme="dark"] dialog { background: #1c1c1e; color: #eee; }
+
+        /* ── Note overlay (CSS-only, no native dialog) ───────── */
+        .note-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.32);
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+        }
+        .note-overlay.open { display: flex; }
+        .note-box {
+            background: var(--pico-card-background-color, #fff);
+            border-radius: 9px;
+            padding: 1.5rem;
+            width: 330px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+        }
+        [data-theme="dark"] .note-box { background: #1c1c1e; color: #eee; }
+        .note-box h4 { margin: 0 0 1rem; font-size: 0.95rem; }
+        .note-box textarea { width: 100%; font-size: 0.82rem; resize: vertical; margin-bottom: 0; }
+
+        /* ── Empty state ────────────────────────────────────── */
+        .empty-state { max-width: 580px; margin: 3rem auto 0; }
+        .empty-state > p { color: var(--pico-muted-color); margin-bottom: 1.75rem; line-height: 1.6; }
+        .empty-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+        .empty-card { border: 1px solid var(--pico-muted-border-color); border-radius: 7px; padding: 1rem; }
+        .empty-card strong { display: block; margin-bottom: 0.3rem; font-size: 0.82rem; }
+        .empty-card p { font-size: 0.78rem; color: var(--pico-muted-color); margin: 0; }
+    </style>
 </head>
 <body>
-    <header class="site-header">
-        <h1>job<span style="font-size: 1.2em; line-height: 1;">X</span>rch</h1>
-        <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">☀️</button>
-    </header>
+<div class="app">
 
-    <div class="layout">
+    <!-- ── Sidebar ─────────────────────────────────────────── -->
+    <aside class="sidebar">
 
-    <div class="sidebar-wrap">
-        <button class="toggle-btn" onclick="document.querySelector('.sidebar').classList.toggle('collapsed')" title="Toggle panel">&#9776;</button>
-        <aside class="sidebar">
-            <section>
-                <h3>Ingest</h3>
-                <a href="/ingest" role="button" style="display: block; width: 100%; text-align: center; font-size: 0.8rem;">+ Add by URL</a>
-                <a href="/jobs/new" role="button" class="secondary" style="display: block; width: 100%; text-align: center; font-size: 0.8rem; margin-top: 0.4rem;">+ Add manually</a>
-            </section>
-            <section>
-                <h3>Tools</h3>
-                <nav style="display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem;">
-                    <a href="/chat">Chat</a>
-                    <a href="/profile">Profile</a>
-                </nav>
-            </section>
-        </aside>
-    </div>
+        <a href="/ingest" class="sidebar-item" title="Add job by URL">
+            <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            <span>Add URL</span>
+        </a>
 
-    <div class="main">
+        <a href="/jobs/new" class="sidebar-item" title="Add job manually">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Add Job</span>
+        </a>
 
-    {% if jobs %}
-    <div class="filter-pills">
-        <button class="pill active" data-filter="saved">Saved</button>
-        <button class="pill active" data-filter="applied">Applied</button>
-        <button class="pill active" data-filter="in-process">In-process</button>
-        <button class="pill active" data-filter="offer">Offer</button>
-        <button class="pill" data-filter="rejected">Rejected</button>
-    </div>
-    <table>
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Company</th>
-                <th>Summary</th>
-                <th>Score</th>
-                <th>Status</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for job in jobs %}
-            <tr data-status="{{ job.status }}">
+        <hr class="sidebar-divider">
 
-                {# Title #}
-                <td>
-                    <a href="/jobs/{{ job.id }}">{{ job.job_title }}</a>
-                </td>
+        <a href="/chat" class="sidebar-item" title="Chat">
+            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Chat</span>
+        </a>
 
-                {# Company + location #}
-                <td>
-                    <span>{{ job.company }}</span><br>
-                    <span class="meta">{{ job.location }}</span>
-                </td>
+        <a href="/profile" class="sidebar-item" title="Profile">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Profile</span>
+        </a>
 
-                {# Evaluation summary #}
-                <td>
-                    {% if job.summary %}
-                        <span class="preview">{{ job.summary }}</span>
-                    {% else %}
-                        <span class="meta">Not evaluated</span>
-                    {% endif %}
-                </td>
+        <div class="sidebar-spacer"></div>
 
-                {# Score #}
-                <td>
-                    {% if job.score %}
-                        {% if job.score >= 7 %}
-                            <span class="score score-high">{{ job.score }}</span>
-                        {% elif job.score >= 4 %}
-                            <span class="score score-mid">{{ job.score }}</span>
-                        {% else %}
-                            <span class="score score-low">{{ job.score }}</span>
-                        {% endif %}
-                    {% else %}
-                        <span class="meta">—</span>
-                    {% endif %}
-                </td>
+        <button class="sidebar-item" id="theme-toggle" title="Toggle theme">
+            <svg id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg id="icon-moon" viewBox="0 0 24 24" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            <span>Theme</span>
+        </button>
+    </aside>
 
-                {# Status: badge + transition select #}
-                <td>
-                    <span class="status-badge status-{{ job.status }}">{{ job.status }}</span>
-                    {% set allowed = status_flow[job.status] %}
-                    {% if allowed %}
-                    <form method="post" action="/jobs/{{ job.id }}/status" class="status-form">
-                        <select name="status" onchange="this.form.submit()">
-                            <option value="" disabled selected>move to…</option>
-                            {% for s in allowed %}
-                            <option value="{{ s }}">{{ s }}</option>
-                            {% endfor %}
-                        </select>
-                    </form>
-                    {% endif %}
-                </td>
+    <!-- ── Main ───────────────────────────────────────────── -->
+    <main class="main">
 
-                {# Actions #}
-                <td>
-                    <div class="row-actions">
-                        <button type="button" class="btn-sm" title="Re-evaluate" onclick="reeval(this, {{ job.id }})">↺</button>
-                        <form method="post" action="/jobs/{{ job.id }}/delete" style="margin:0;" onsubmit="return confirm('Remove this job?')">
-                            <button type="submit" class="btn-sm danger" title="Delete">✕</button>
-                        </form>
-                    </div>
-                </td>
+        <span class="page-logo">jobXrch</span>
 
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div style="max-width: 1000px; margin: 2rem auto; padding: 0 1rem;">
-
-        <p style="font-size: 1rem; color: var(--pico-muted-color, #4d0909); margin-bottom: 2rem;">
-            jobXrch is a local, AI-powered job search assistant and tracker — it fetches job postings, scores them against your career profile, and gives you a chat interface to reason through your options.
-        </p>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2.5rem;">
-
-            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.4rem;">Job Board <span style="font-weight:400; font-size:0.8rem; color: var(--pico-muted-color, #888);">(this page)</span></div>
-                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Scored, filterable list of all your saved jobs. Sort by score, filter by status, re-evaluate anytime.</p>
-            </div>
-
-            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.4rem;">Add Job <a href="/ingest" style="font-weight:400; font-size:0.8rem;">/ingest</a></div>
-                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Paste a LinkedIn job URL — jobXrch fetches the full description and scores it against your profile automatically.</p>
-            </div>
-
-            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.4rem;">Chat <a href="/chat" style="font-weight:400; font-size:0.8rem;">/chat</a></div>
-                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Talk to an AI career coach with live access to your job list. Ask it to compare roles, surface patterns, or prep for interviews.</p>
-            </div>
-
-            <div style="border: 1px solid var(--pico-muted-border-color, #333); border-radius: 6px; padding: 1rem;">
-                <div style="font-weight: 600; margin-bottom: 0.4rem;">Profile <a href="/profile" style="font-weight:400; font-size:0.8rem;">/profile</a></div>
-                <p style="font-size: 0.85rem; color: var(--pico-muted-color, #888); margin: 0;">Your career goals, preferences, and constraints. The LLM uses this to score every job. Keep it current; use Chat → "Save to profile" to distill insights automatically.</p>
-            </div>
-
+        {% if jobs %}
+        <div class="filter-row">
+            <button class="pill active" data-filter="saved">Saved</button>
+            <button class="pill active" data-filter="applied">Applied</button>
+            <button class="pill active" data-filter="in-process">In Process</button>
+            <button class="pill active" data-filter="offer">Offer</button>
+            <button class="pill" data-filter="rejected">Rejected</button>
+            <input id="search" type="search" placeholder="Search…" autocomplete="off"
+                   style="margin-left:auto;width:180px;font-size:0.75rem;padding:0.18rem 0.6rem;height:auto;margin-bottom:0;">
         </div>
 
+        <table>
+            <colgroup>
+                <col class="col-company">
+                <col class="col-title">
+                <col class="col-note">
+                <col class="col-status">
+                <col class="col-score">
+                <col class="col-edit">
+                <col class="col-delete">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th data-sort="0">Company</th>
+                    <th data-sort="1">Title</th>
+                    <th>Notes</th>
+                    <th data-sort="3">Status</th>
+                    <th data-sort="4" class="col-score">Score</th>
+                    <th></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for job in jobs %}
+                <tr class="job-row" data-status="{{ job.status }}" data-job-id="{{ job.id }}" onclick="toggleExpand(this, event)">
+
+                    <td title="Click to expand summary">
+                        <span>{{ job.company }}</span>
+                        <span class="meta">{{ job.location }}</span>
+                    </td>
+
+                    <td>
+                        <a class="job-title-link" href="/jobs/{{ job.id }}" onclick="event.stopPropagation()">{{ job.job_title }}</a>
+                    </td>
+
+                    <td onclick="event.stopPropagation()">
+                        <button type="button" class="btn-sm note-btn" title="Add a note to this job"
+                                data-job-id="{{ job.id }}" data-job-title="{{ job.job_title | e }}">+</button>
+                    </td>
+
+                    <td>
+                        {% set tip %}{{ job.last_event_type }}{% if job.last_event_at %} · {{ job.last_event_at[:10] }}{% endif %}{% if job.last_event_note %} — {{ job.last_event_note }}{% endif %}{% endset %}
+                        <span class="status-badge status-{{ job.status }}" title="{{ tip }}">{{ job.status }}</span>
+                        {% set allowed = status_flow[job.status] %}
+                        {% if allowed %}
+                        <form method="post" action="/jobs/{{ job.id }}/status" class="status-form" onclick="event.stopPropagation()">
+                            <input type="hidden" name="status">
+                            <input type="hidden" name="note">
+                            <select onchange="onStatusChange(this)">
+                                <option value="" disabled selected>move to…</option>
+                                {% for s in allowed %}
+                                <option value="{{ s }}">{{ s }}</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if job.score %}
+                            {% if job.score >= 7 %}
+                                <span class="score score-high">{{ job.score }}</span>
+                            {% elif job.score >= 4 %}
+                                <span class="score score-mid">{{ job.score }}</span>
+                            {% else %}
+                                <span class="score score-low">{{ job.score }}</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="score meta">—</span>
+                        {% endif %}
+                    </td>
+
+                    <td onclick="event.stopPropagation()">
+                        <a href="/jobs/{{ job.id }}/edit" class="btn-sm" title="Edit job details">✏</a>
+                    </td>
+
+                    <td onclick="event.stopPropagation()">
+                        <form method="post" action="/jobs/{{ job.id }}/delete" style="margin:0;" onsubmit="return confirm('Remove this job?')">
+                            <button type="submit" class="btn-sm danger" title="Remove this job">✕</button>
+                        </form>
+                    </td>
+
+                </tr>
+                <tr class="expand-row" id="expand-{{ job.id }}">
+                    <td colspan="7">
+                        <div class="expand-content">
+                            {% if job.summary %}
+                                {{ job.summary }}
+                            {% else %}
+                                <span class="meta">No evaluation summary yet.</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <div class="empty-state">
+            <p>jobXrch is a local, AI-powered job search assistant — fetch job postings, score them against your profile, and use chat to reason through your options.</p>
+            <div class="empty-grid">
+                <div class="empty-card">
+                    <strong>Add a job</strong>
+                    <p>Use "Add URL" in the sidebar to ingest a LinkedIn job posting automatically.</p>
+                </div>
+                <div class="empty-card">
+                    <strong>Set up your profile</strong>
+                    <p>Visit Profile to tell the LLM about your goals, experience, and preferences.</p>
+                </div>
+                <div class="empty-card">
+                    <strong>Chat</strong>
+                    <p>Talk to an AI career coach with live access to your job list.</p>
+                </div>
+                <div class="empty-card">
+                    <strong>Add manually</strong>
+                    <p>Use "Add Job" to enter a job posting by hand without a URL.</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </main>
+</div>
+
+<!-- ── Status modal ───────────────────────────────────────── -->
+<dialog id="status-modal">
+    <h4>Move to <strong id="modal-status-label"></strong></h4>
+    <input type="text" id="modal-note" placeholder="Note (optional)" maxlength="200">
+    <div class="modal-actions">
+        <button type="button" class="secondary" onclick="cancelStatus()">Cancel</button>
+        <button type="button" onclick="confirmStatus()">Confirm</button>
     </div>
-    {% endif %}
+</dialog>
 
-    </div>{# /.main #}
-    </div>{# /.layout #}
-    <script>
-    document.querySelectorAll('thead th').forEach((th, col) => {
-        th.addEventListener('click', () => {
-            const table = th.closest('table');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            const asc = !th.classList.contains('sort-asc');
+<!-- ── Note overlay ───────────────────────────────────────── -->
+<div id="note-overlay" class="note-overlay">
+    <div class="note-box">
+        <h4>Note — <strong id="note-modal-title"></strong></h4>
+        <textarea id="note-text" rows="3" placeholder="Add a note…" maxlength="1000"></textarea>
+        <div class="modal-actions">
+            <button type="button" class="secondary" onclick="closeNoteModal()">Cancel</button>
+            <button type="button" id="note-submit-btn" onclick="submitNote()">Save</button>
+        </div>
+    </div>
+</div>
 
-            table.querySelectorAll('th').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
-            th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+<script>
+// ── Theme ──────────────────────────────────────────────────
+function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('theme', t);
+    const dark = t === 'dark';
+    document.getElementById('icon-sun').style.display  = dark ? 'none' : '';
+    document.getElementById('icon-moon').style.display = dark ? '' : 'none';
+}
+applyTheme(localStorage.getItem('theme') || 'light');
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
 
-            rows.sort((a, b) => {
-                const aText = a.cells[col]?.innerText.trim() ?? '';
-                const bText = b.cells[col]?.innerText.trim() ?? '';
-                const aNum = parseFloat(aText);
-                const bNum = parseFloat(bText);
-                const numeric = !isNaN(aNum) && !isNaN(bNum);
-                const cmp = numeric ? aNum - bNum : aText.localeCompare(bText);
-                return asc ? cmp : -cmp;
-            });
+// ── Sort ───────────────────────────────────────────────────
+document.querySelectorAll('thead th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const col = parseInt(th.dataset.sort);
+        const tbody = th.closest('table').querySelector('tbody');
+        const jobRows = Array.from(tbody.querySelectorAll('.job-row'));
+        const asc = !th.classList.contains('sort-asc');
 
-            rows.forEach(r => tbody.appendChild(r));
+        document.querySelectorAll('thead th').forEach(t => t.classList.remove('sort-asc', 'sort-desc'));
+        th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+        jobRows.sort((a, b) => {
+            const aText = a.cells[col]?.innerText.trim() ?? '';
+            const bText = b.cells[col]?.innerText.trim() ?? '';
+            const aNum = parseFloat(aText), bNum = parseFloat(bText);
+            const cmp = (!isNaN(aNum) && !isNaN(bNum)) ? aNum - bNum : aText.localeCompare(bText);
+            return asc ? cmp : -cmp;
+        });
+
+        jobRows.forEach(row => {
+            const expandRow = document.getElementById('expand-' + row.dataset.jobId);
+            tbody.appendChild(row);
+            if (expandRow) tbody.appendChild(expandRow);
         });
     });
+});
 
-    // Default sort: score (col 3) descending
-    const scoreTh = document.querySelectorAll('thead th')[3];
-    if (scoreTh) {
-        scoreTh.classList.add('sort-asc'); // trick sort into flipping to desc
-        scoreTh.click();
-    }
+// Default sort: score descending (col 4)
+const scoreTh = document.querySelector('thead th[data-sort="4"]');
+if (scoreTh) { scoreTh.classList.add('sort-asc'); scoreTh.click(); }
 
-    function applyFilter() {
-        const active = new Set(
-            [...document.querySelectorAll('.pill.active')].map(p => p.dataset.filter)
-        );
-        document.querySelectorAll('tbody tr').forEach(row => {
-            row.style.display = active.has(row.dataset.status) ? '' : 'none';
-        });
-    }
-
-    document.querySelectorAll('.pill').forEach(pill => {
-        pill.addEventListener('click', () => {
-            pill.classList.toggle('active');
-            applyFilter();
-        });
+// ── Filter + search ────────────────────────────────────────
+function applyFilter() {
+    const active = new Set([...document.querySelectorAll('.pill.active')].map(p => p.dataset.filter));
+    const q = (document.getElementById('search')?.value ?? '').toLowerCase().trim();
+    document.querySelectorAll('.job-row').forEach(row => {
+        const statusOk = active.has(row.dataset.status);
+        const text = row.innerText.toLowerCase();
+        const searchOk = !q || text.includes(q);
+        const show = statusOk && searchOk;
+        row.style.display = show ? '' : 'none';
+        const exp = document.getElementById('expand-' + row.dataset.jobId);
+        if (exp && !show) { exp.style.display = 'none'; exp.classList.remove('open'); }
     });
+}
+document.querySelectorAll('.pill').forEach(p => p.addEventListener('click', () => { p.classList.toggle('active'); applyFilter(); }));
+document.getElementById('search')?.addEventListener('input', applyFilter);
+applyFilter();
 
-    applyFilter();
+// ── Expand row ─────────────────────────────────────────────
+function toggleExpand(row, event) {
+    if (event.target.closest('a, button, select, form')) return;
+    const exp = document.getElementById('expand-' + row.dataset.jobId);
+    if (!exp) return;
+    const opening = !exp.classList.contains('open');
+    exp.classList.toggle('open', opening);
+    exp.style.display = '';
+    row.classList.toggle('expanded', opening);
+}
 
-    // Theme toggle
-    const themeBtn = document.getElementById('theme-toggle');
-    function applyTheme(theme) {
-        document.documentElement.setAttribute('data-theme', theme);
-        themeBtn.textContent = theme === 'dark' ? '☀️' : '🌙';
-        localStorage.setItem('theme', theme);
-    }
-    // Sync button icon with current theme on load
-    applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
-    themeBtn.addEventListener('click', () => {
-        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        applyTheme(next);
-    });
+// ── Status modal ───────────────────────────────────────────
+let _pendingForm = null;
+document.getElementById('status-modal').addEventListener('cancel', cancelStatus);
+document.getElementById('modal-note').addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmStatus();
+    if (e.key === 'Escape') cancelStatus();
+});
 
-    async function reeval(btn, jobId) {
-        btn.disabled = true;
-        btn.textContent = '…';
-        try {
-            const resp = await fetch(`/jobs/${jobId}/evaluate`, {method: 'POST'});
-            if (!resp.ok) throw new Error(resp.statusText);
-            btn.textContent = '✓';
-            setTimeout(() => { btn.textContent = '↺'; btn.disabled = false; }, 2000);
-        } catch {
-            btn.textContent = '!';
-            btn.disabled = false;
-        }
-    }
-    </script>
+function onStatusChange(select) {
+    if (!select.value) return;
+    _pendingForm = select.closest('form');
+    document.getElementById('modal-status-label').textContent = select.value;
+    document.getElementById('modal-note').value = '';
+    setTimeout(() => { document.getElementById('status-modal').showModal(); document.getElementById('modal-note').focus(); }, 0);
+}
+function confirmStatus() {
+    if (!_pendingForm) return;
+    _pendingForm.querySelector('[name=status]').value = _pendingForm.querySelector('select').value;
+    _pendingForm.querySelector('[name=note]').value = document.getElementById('modal-note').value;
+    document.getElementById('status-modal').close();
+    _pendingForm.submit();
+    _pendingForm = null;
+}
+function cancelStatus() {
+    if (_pendingForm) { _pendingForm.querySelector('select').value = ''; _pendingForm = null; }
+    document.getElementById('status-modal').close();
+}
+
+// ── Note overlay ───────────────────────────────────────────
+let _noteJobId = null;
+const _noteOverlay = document.getElementById('note-overlay');
+
+document.querySelectorAll('.note-btn').forEach(btn => {
+    btn.addEventListener('click', () => openNoteModal(btn.dataset.jobId, btn.dataset.jobTitle));
+});
+_noteOverlay.addEventListener('click', e => { if (e.target === _noteOverlay) closeNoteModal(); });
+
+function openNoteModal(jobId, jobTitle) {
+    _noteJobId = jobId;
+    document.getElementById('note-modal-title').textContent = jobTitle;
+    document.getElementById('note-text').value = '';
+    document.getElementById('note-submit-btn').textContent = 'Save';
+    document.getElementById('note-submit-btn').disabled = false;
+    _noteOverlay.classList.add('open');
+    document.getElementById('note-text').focus();
+}
+function closeNoteModal() {
+    _noteJobId = null;
+    _noteOverlay.classList.remove('open');
+}
+async function submitNote() {
+    const text = document.getElementById('note-text').value.trim();
+    if (!text || !_noteJobId) return;
+    const btn = document.getElementById('note-submit-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const r = await fetch(`/jobs/${_noteJobId}/note`, { method: 'POST', body: new URLSearchParams({ note: text }) });
+        if (!r.ok) throw new Error();
+        closeNoteModal();
+    } catch { btn.textContent = 'Error — retry'; btn.disabled = false; }
+}
+document.getElementById('note-text').addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeNoteModal();
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitNote();
+});
+</script>
 </body>
 </html>

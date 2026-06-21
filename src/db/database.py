@@ -103,6 +103,21 @@ def init_db() -> None:
                 cost_usd         REAL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS job_events (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id      INTEGER NOT NULL REFERENCES jobs(id),
+                event_type  TEXT NOT NULL,
+                note        TEXT,
+                timestamp   TEXT NOT NULL
+            )
+        """)
+        # Backfill: create an "ingested" event for jobs that have none
+        conn.execute("""
+            INSERT INTO job_events (job_id, event_type, timestamp)
+            SELECT id, 'ingested', scraped_at FROM jobs
+            WHERE id NOT IN (SELECT DISTINCT job_id FROM job_events)
+        """)
         # Seed profile from criteria.txt on first startup
         row = conn.execute("SELECT id FROM user_profile WHERE id = 1").fetchone()
         if row is None and os.path.exists(CRITERIA_PATH):
@@ -157,22 +172,39 @@ def get_all_jobs() -> list[dict]:
         rows = conn.execute("""
             SELECT j.id, j.job_title, j.company, j.location, j.link, j.description,
                    j.source, j.status, j.scraped_at,
-                   e.score, e.summary, e.assessment, e.evaluated_at
+                   e.score, e.summary, e.assessment, e.evaluated_at,
+                   ev.event_type as last_event_type,
+                   ev.note       as last_event_note,
+                   ev.timestamp  as last_event_at
             FROM jobs j
             LEFT JOIN (
                 SELECT job_id, score, summary, assessment, evaluated_at
                 FROM evaluations
                 WHERE id IN (SELECT MAX(id) FROM evaluations GROUP BY job_id)
             ) e ON j.id = e.job_id
+            LEFT JOIN (
+                SELECT job_id, event_type, note, timestamp
+                FROM job_events
+                WHERE id IN (SELECT MAX(id) FROM job_events GROUP BY job_id)
+            ) ev ON j.id = ev.job_id
             WHERE j.deleted = 0
             ORDER BY e.score DESC NULLS LAST, j.scraped_at DESC
         """).fetchall()
         return [dict(row) for row in rows]
 
 
-def update_job_status(job_id: int, status: str) -> None:
+def log_job_event(job_id: int, event_type: str, note: Optional[str] = None) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO job_events (job_id, event_type, note, timestamp) VALUES (?, ?, ?, ?)",
+            (job_id, event_type, note or None, datetime.now(timezone.utc).isoformat()),
+        )
+
+
+def update_job_status(job_id: int, status: str, note: Optional[str] = None) -> None:
     with _connect() as conn:
         conn.execute("UPDATE jobs SET status = ? WHERE id = ?", (status, job_id))
+    log_job_event(job_id, status, note)
 
 
 def get_unevaluated_jobs() -> list[dict]:
@@ -318,6 +350,16 @@ def get_all_cv_versions() -> list[dict]:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT id, label, job_id, parent_id, created_at FROM cv_versions ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_job_cv_versions(job_id: int) -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, label, created_at FROM cv_versions WHERE job_id = ? ORDER BY created_at DESC",
+            (job_id,),
         ).fetchall()
         return [dict(r) for r in rows]
 
