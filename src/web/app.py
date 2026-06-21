@@ -1,11 +1,14 @@
 # src/web/app.py
 import os
+import time
 import uuid
 import threading
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
 from src.db.database import (
     init_db,
     save_evaluation,
@@ -36,7 +39,41 @@ TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 ALL_STATUSES = ["saved", "applied", "in-process", "offer", "rejected"]
 STATUS_FLOW = {s: [t for t in ALL_STATUSES if t != s] for s in ALL_STATUSES}
 
+_STARTUP_T = str(time.time())
+_DEV_SCRIPT = (
+    b"<script>"
+    b"(function(){"
+    b"var t;"
+    b"setInterval(function(){"
+    b"fetch('/__dev__/ping').then(function(r){return r.json();}).then(function(d){"
+    b"if(t&&t!==d.t)location.reload();"
+    b"t=d.t;"
+    b"}).catch(function(){});"
+    b"},800);"
+    b"})();"
+    b"</script>"
+)
+
+
+class _DevReloadMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if "text/html" not in response.headers.get("content-type", ""):
+            return response
+        body = b"".join([chunk async for chunk in response.body_iterator])
+        body = body.replace(b"</body>", _DEV_SCRIPT + b"</body>")
+        headers = dict(response.headers)
+        headers["content-length"] = str(len(body))
+        return StarletteResponse(
+            content=body,
+            status_code=response.status_code,
+            headers=headers,
+            media_type=response.media_type,
+        )
+
+
 app = FastAPI()
+app.add_middleware(_DevReloadMiddleware)
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 ingest_tasks: dict[str, dict] = {}
@@ -46,6 +83,11 @@ tailor_tasks: dict[str, dict] = {}
 @app.on_event("startup")
 def startup():
     init_db()
+
+
+@app.get("/__dev__/ping")
+def dev_ping():
+    return JSONResponse({"t": _STARTUP_T})
 
 
 @app.get("/", response_class=HTMLResponse)
