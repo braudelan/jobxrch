@@ -4,6 +4,7 @@ from src.db.database import (
     init_db, is_job_saved, save_job, _connect, DB_PATH,
     get_profile, save_profile, get_profile_updated_at,
     save_message, get_messages, get_messages_since,
+    log_job_event, update_job_status, get_job_events,
 )
 # --- Fixtures ---
 @pytest.fixture(autouse=True)
@@ -150,3 +151,34 @@ def test_migration_adds_source_to_existing_db(tmp_path, monkeypatch):
     with sqlite3.connect(tmp_db) as conn:
         columns = {row[1] for row in conn.execute("PRAGMA table_info(jobs)")}
     assert "source" in columns
+# --- job_events ---
+def _saved_job_id() -> int:
+    save_job(_sample_job())
+    with _connect() as conn:
+        return conn.execute("SELECT id FROM jobs").fetchone()[0]
+def test_get_job_events_empty_for_job_with_none():
+    assert get_job_events(_saved_job_id()) == []
+def test_log_job_event_persists():
+    job_id = _saved_job_id()
+    log_job_event(job_id, "note", "a note")
+    events = get_job_events(job_id)
+    assert len(events) == 1
+    assert events[0]["event_type"] == "note"
+    assert events[0]["note"] == "a note"
+def test_get_job_events_orders_most_recent_first():
+    job_id = _saved_job_id()
+    log_job_event(job_id, "applied")
+    log_job_event(job_id, "in-process")
+    events = get_job_events(job_id)
+    assert [e["event_type"] for e in events] == ["in-process", "applied"]
+def test_update_job_status_logs_event_with_note():
+    job_id = _saved_job_id()
+    update_job_status(job_id, "rejected", "no response after 60 days")
+    events = get_job_events(job_id)
+    assert events[0]["event_type"] == "rejected"
+    assert events[0]["note"] == "no response after 60 days"
+def test_update_job_status_without_note():
+    job_id = _saved_job_id()
+    update_job_status(job_id, "applied")
+    events = get_job_events(job_id)
+    assert events[0]["note"] is None

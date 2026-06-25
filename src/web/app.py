@@ -26,6 +26,7 @@ from src.db.database import (
     get_messages,
     get_cv_version,
     get_job_cv_versions,
+    get_job_events,
 )
 from src.scraper.fetcher import ingest_job_from_url
 from src.llm_utils.evaluate import evaluate_job
@@ -209,6 +210,7 @@ def job_detail(request: Request, job_id: int, new: bool = False):
             "status_flow": STATUS_FLOW,
             "new": new,
             "cv_versions": get_job_cv_versions(job_id),
+            "job_events": get_job_events(job_id),
         },
     )
 

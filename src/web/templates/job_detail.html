@@ -66,6 +66,12 @@
         .tailor-btn { background: none; border: 1px solid var(--pico-muted-border-color); color: var(--pico-muted-color); font-size: 0.78rem; padding: 0.3rem 0.9rem; border-radius: 4px; cursor: pointer; }
         .tailor-btn:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
         .tailor-result { font-size: 0.78rem; margin-top: 0.4rem; }
+        .event-timeline { list-style: none; margin: 0; padding: 0; }
+        .event-item { padding: 0.4rem 0; border-bottom: 1px solid var(--pico-muted-border-color); }
+        .event-item:last-child { border-bottom: none; }
+        .event-note { font-size: 0.8rem; margin-top: 0.25rem; white-space: pre-wrap; }
+        .event-tag { display: inline-block; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: #e8e8e8; color: #555; }
+        [data-theme="dark"] .event-tag { background: #2a2a2a; color: #aaa; }
         .theme-toggle { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 999px; cursor: pointer; font-size: 1rem; padding: 0.25rem 0.6rem; color: var(--pico-muted-color); line-height: 1; }
         .theme-toggle:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
         [data-theme="dark"] .status-saved      { background: #2a2a2a; color: #aaa; }
@@ -166,6 +172,30 @@
             <button type="button" class="reeval-btn" onclick="toggleNoteForm()">Cancel</button>
         </div>
     </div>
+
+    {# Event timeline #}
+    {% if job_events %}
+    <section class="card">
+        <h3>History</h3>
+        <ul class="event-timeline" id="event-timeline">
+            {% for ev in job_events %}
+            <li class="event-item">
+                {% if ev.event_type == 'note' %}
+                    <span class="event-tag">note</span>
+                {% elif ev.event_type == 'ingested' %}
+                    <span class="event-tag">saved</span>
+                {% else %}
+                    <span class="status-badge status-{{ ev.event_type }}">{{ ev.event_type }}</span>
+                {% endif %}
+                <span class="eval-meta">{{ ev.timestamp[:10] }}</span>
+                {% if ev.note %}
+                <div class="event-note">{{ ev.note }}</div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
 
     {# Summary #}
     {% if job.summary %}
@@ -286,6 +316,7 @@
             const resp = await fetch(`/jobs/${jobId}/note`, { method: 'POST', body });
             if (!resp.ok) throw new Error(resp.statusText);
             btn.textContent = '✓ Saved';
+            addEventToTimeline('note', text);
             setTimeout(() => {
                 document.getElementById('note-form').style.display = 'none';
                 document.getElementById('detail-note-text').value = '';
@@ -296,6 +327,36 @@
             btn.textContent = 'Error — retry';
             btn.disabled = false;
         }
+    }
+
+    function addEventToTimeline(eventType, note) {
+        let list = document.getElementById('event-timeline');
+        if (!list) {
+            const section = document.createElement('section');
+            section.className = 'card';
+            section.innerHTML = '<h3>History</h3>';
+            list = document.createElement('ul');
+            list.className = 'event-timeline';
+            list.id = 'event-timeline';
+            section.appendChild(list);
+            document.querySelector('.status-row').insertAdjacentElement('afterend', section);
+        }
+        const li = document.createElement('li');
+        li.className = 'event-item';
+        const tag = document.createElement('span');
+        tag.className = eventType === 'note' ? 'event-tag' : `status-badge status-${eventType}`;
+        tag.textContent = eventType === 'note' ? 'note' : eventType;
+        const meta = document.createElement('span');
+        meta.className = 'eval-meta';
+        meta.textContent = new Date().toISOString().slice(0, 10);
+        li.append(tag, ' ', meta);
+        if (note) {
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'event-note';
+            noteDiv.textContent = note;
+            li.appendChild(noteDiv);
+        }
+        list.insertBefore(li, list.firstChild);
     }
 
     // Theme toggle

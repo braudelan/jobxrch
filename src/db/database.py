@@ -216,6 +216,16 @@ def update_job_status(job_id: int, status: str, note: Optional[str] = None) -> N
     log_job_event(job_id, status, note)
 
 
+def get_job_events(job_id: int) -> list[dict]:
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, event_type, note, timestamp FROM job_events WHERE job_id = ? ORDER BY timestamp DESC",
+            (job_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def get_unevaluated_jobs() -> list[dict]:
     with _connect() as conn:
         conn.row_factory = sqlite3.Row
