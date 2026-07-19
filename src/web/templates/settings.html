@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — jobXrch</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { max-width: 720px; margin: 0 auto; padding: 1.5rem; font-size: 0.85rem; }
+
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        .top-bar h2 { margin: 0; font-size: 1.1rem; }
+        .top-bar nav { display: flex; gap: 1rem; font-size: 0.78rem; }
+        .top-bar nav a { color: var(--pico-muted-color); text-decoration: none; }
+        .top-bar nav a:hover { color: var(--pico-primary); }
+        .theme-toggle { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 999px; cursor: pointer; font-size: 1rem; padding: 0.25rem 0.6rem; color: var(--pico-muted-color); line-height: 1; }
+        .theme-toggle:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+
+        .section-label { font-size: 0.8rem; color: var(--pico-muted-color); display: block; margin-bottom: 0.75rem; margin-top: 1.25rem; }
+        .section-label:first-of-type { margin-top: 0; }
+
+        .provider-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+        .provider-row {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.6rem 0.9rem;
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .provider-row:has(input:checked) { border-color: var(--pico-primary); background: color-mix(in srgb, var(--pico-primary) 6%, transparent); }
+        .provider-row input[type=radio] { margin: 0; }
+        .provider-name { font-weight: 500; flex: 1; }
+        .badge {
+            font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 999px;
+            background: color-mix(in srgb, var(--pico-color) 10%, transparent);
+            color: var(--pico-muted-color);
+        }
+        .badge.ok { background: color-mix(in srgb, green 15%, transparent); color: green; }
+        .badge.missing { background: color-mix(in srgb, orange 15%, transparent); color: orange; }
+
+        .model-grid { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
+        .model-row { display: flex; align-items: center; gap: 0.75rem; }
+        .model-row label { width: 90px; font-size: 0.8rem; color: var(--pico-muted-color); margin: 0; flex-shrink: 0; }
+        .model-row input { margin: 0; font-size: 0.82rem; font-family: monospace; }
+
+        .save-row { margin-top: 1.25rem; }
+        .save-row button { padding: 0.4rem 1.25rem; font-size: 0.83rem; }
+    </style>
+    <script>(function(){const t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);})();</script>
+</head>
+<body>
+    <div class="top-bar">
+        <h2>Settings</h2>
+        <nav>
+            <a href="/">list</a>
+            <a href="/chat">chat</a>
+            <a href="/profile">profile</a>
+        </nav>
+        <button class="theme-toggle" id="theme-toggle">☀️</button>
+    </div>
+
+    <form method="post" action="/settings">
+        <span class="section-label">LLM provider — used for chat and job evaluation</span>
+        <div class="provider-list">
+            {% for p in providers %}
+            <label class="provider-row">
+                <input type="radio" name="provider" value="{{ p }}" {% if p == current_provider %}checked{% endif %}>
+                <span class="provider-name">{{ p }}</span>
+                {% if p in available %}
+                    {% if available[p] %}
+                    <span class="badge ok">key set</span>
+                    {% else %}
+                    <span class="badge missing">no API key</span>
+                    {% endif %}
+                {% else %}
+                <span class="badge ok">no key needed</span>
+                {% endif %}
+            </label>
+            {% endfor %}
+        </div>
+
+        <span class="section-label">Model versions</span>
+        <div class="model-grid">
+            {% for p, default_model in provider_default_models.items() %}
+            <div class="model-row">
+                <label>{{ p }}</label>
+                <input
+                    type="text"
+                    name="{{ p }}_model"
+                    value="{{ current_models.get(p, default_model) }}"
+                    placeholder="{{ default_model }}"
+                >
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="save-row">
+            <button type="submit">Save</button>
+        </div>
+    </form>
+
+    <script>
+        const btn = document.getElementById('theme-toggle');
+        btn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        });
+    </script>
+</body>
+</html>

@@ -21,7 +21,9 @@ def run():
 
         page.goto("https://www.linkedin.com/my-items/saved-jobs/")
         if "login" in page.url or "authwall" in page.url:
-            print("Not logged in. Please log in the browser window, then press Enter...")
+            print(
+                "Not logged in. Please log in the browser window, then press Enter..."
+            )
             input()
 
         print("Initialization complete. Starting crawler...")
@@ -29,10 +31,14 @@ def run():
         print(f"Found {len(jobs)} saved jobs.")
 
         new_jobs = [job for job in jobs if not is_job_saved(job)]
-        print(f"{len(new_jobs)} new jobs to fetch. {len(jobs) - len(new_jobs)} already in DB, skipping.")
+        print(
+            f"{len(new_jobs)} new jobs to fetch. {len(jobs) - len(new_jobs)} already in DB, skipping."
+        )
 
         for i, job in enumerate(new_jobs, 1):
-            print(f"[{i}/{len(new_jobs)}] Fetching: {job['job_title']} at {job['company']}")
+            print(
+                f"[{i}/{len(new_jobs)}] Fetching: {job['job_title']} at {job['company']}"
+            )
             job["description"] = fetch_job_description(context, job["link"])
             save_job(job)
 

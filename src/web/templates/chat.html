@@ -18,12 +18,49 @@
             border-bottom: 1px solid var(--pico-muted-border-color);
             flex-shrink: 0;
         }
+        .top-bar-left { display: flex; align-items: center; gap: 0.75rem; position: relative; }
         .top-bar h2 { margin: 0; font-size: 1rem; font-weight: 700; }
         .top-bar nav { display: flex; gap: 1rem; font-size: 0.95rem; }
         .top-bar nav a { color: var(--pico-muted-color); text-decoration: none; }
         .top-bar nav a:hover { color: var(--pico-primary); }
         .theme-toggle { background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 999px; cursor: pointer; font-size: 1rem; padding: 0.25rem 0.6rem; color: var(--pico-muted-color); line-height: 1; }
         .theme-toggle:hover { border-color: var(--pico-primary); color: var(--pico-primary); }
+
+        .model-pill {
+            display: inline-flex; align-items: center; gap: 0.65rem;
+            font-size: 0.72rem; font-family: monospace;
+            color: #fff;
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 999px;
+            padding: 0.15rem 0.6rem;
+            cursor: pointer;
+            user-select: none;
+            transition: border-color 0.15s, color 0.15s;
+        }
+        .model-pill:hover { border-color: var(--pico-primary); color: #fff; }
+        .model-pill .arrow { font-size: 0.6rem; opacity: 0.7; }
+
+        .model-popover {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            z-index: 100;
+            background: var(--pico-card-background-color);
+            border: 1px solid var(--pico-muted-border-color);
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            padding: 1rem;
+            min-width: 280px;
+        }
+        .model-popover.open { display: block; }
+        .popover-label { font-size: 0.72rem; color: var(--pico-muted-color); display: block; margin-bottom: 0.4rem; }
+        .popover-label + .popover-label { margin-top: 0.75rem; }
+        .popover-select { width: 100%; font-size: 0.8rem; margin: 0 0 0.1rem; padding: 0.3rem 0.5rem; }
+        .popover-input { width: 100%; font-size: 0.8rem; font-family: monospace; margin: 0 0 0.1rem; padding: 0.3rem 0.5rem; }
+        .popover-unavail { font-size: 0.7rem; color: orange; margin-top: 0.2rem; }
+        .popover-save { margin-top: 0.75rem; padding: 0.3rem 0.9rem; font-size: 0.8rem; }
+        .popover-status { font-size: 0.72rem; color: var(--pico-muted-color); margin-top: 0.4rem; min-height: 1em; }
 
         .messages {
             overflow-y: auto;
@@ -112,10 +149,37 @@
 </head>
 <body>
     <div class="top-bar">
-        <h2>Chat</h2>
+        <div class="top-bar-left">
+            <h2>Chat</h2>
+            <div id="model-pill-container">
+                <button class="model-pill" id="model-pill" type="button">
+                    <span id="pill-label">{{ current_provider }} · {{ current_model }}</span>
+                    <span class="arrow">▾</span>
+                </button>
+                <div class="model-popover" id="model-popover">
+                    <span class="popover-label">Provider</span>
+                    <select class="popover-select" id="popover-provider">
+                        {% for p in providers %}
+                        <option value="{{ p }}" {% if p == current_provider %}selected{% endif %}>
+                            {{ p }}{% if not available[p] %} (no key){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div id="popover-model-section">
+                        <span class="popover-label" id="popover-model-label">Model</span>
+                        <input class="popover-input" id="popover-model" type="text"
+                               value="{{ current_model }}"
+                               placeholder="{{ provider_default_models.get(current_provider, '') }}">
+                    </div>
+                    <button class="popover-save" id="popover-save" type="button">Apply</button>
+                    <div class="popover-status" id="popover-status"></div>
+                </div>
+            </div>
+        </div>
         <nav>
             <a href="/">list</a>
             <a href="/profile">profile</a>
+            <a href="/settings">settings</a>
         </nav>
         <button class="theme-toggle" id="theme-toggle">☀️</button>
     </div>
@@ -263,6 +327,77 @@
         function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); btn.textContent = t === 'dark' ? '☀️' : '🌙'; localStorage.setItem('theme', t); }
         applyTheme(document.documentElement.getAttribute('data-theme') || 'light');
         btn.addEventListener('click', () => applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
+    })();
+
+    // Model picker popover
+    (function() {
+        const defaultModels = {{ provider_default_models | tojson }};
+        const currentModels = {{ current_models | tojson }};
+
+        const pill = document.getElementById('model-pill');
+        const pillLabel = document.getElementById('pill-label');
+        const popover = document.getElementById('model-popover');
+        const providerSelect = document.getElementById('popover-provider');
+        const modelInput = document.getElementById('popover-model');
+        const modelSection = document.getElementById('popover-model-section');
+        const modelLabel = document.getElementById('popover-model-label');
+        const saveBtn = document.getElementById('popover-save');
+        const status = document.getElementById('popover-status');
+
+        function updateModelField(provider) {
+            const hasModel = provider in defaultModels;
+            modelSection.style.display = hasModel ? '' : 'none';
+            if (hasModel) {
+                modelInput.value = currentModels[provider] || defaultModels[provider] || '';
+                modelInput.placeholder = defaultModels[provider] || '';
+                modelLabel.textContent = 'Model';
+            }
+        }
+
+        pill.addEventListener('click', e => {
+            e.stopPropagation();
+            popover.classList.toggle('open');
+            if (popover.classList.contains('open')) {
+                updateModelField(providerSelect.value);
+                status.textContent = '';
+            }
+        });
+
+        providerSelect.addEventListener('change', () => updateModelField(providerSelect.value));
+
+        document.addEventListener('click', e => {
+            if (!document.getElementById('model-pill-container').contains(e.target)) {
+                popover.classList.remove('open');
+            }
+        });
+
+        saveBtn.addEventListener('click', async () => {
+            const provider = providerSelect.value;
+            const payload = { provider };
+            Object.keys(defaultModels).forEach(p => {
+                payload[`${p}_model`] = p === provider ? modelInput.value.trim() : (currentModels[p] || defaultModels[p]);
+            });
+
+            saveBtn.disabled = true;
+            status.textContent = 'Saving…';
+            try {
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                currentModels[provider] = payload[`${provider}_model`];
+                const model = currentModels[provider] || defaultModels[provider] || '';
+                pillLabel.textContent = `${provider} · ${model}`;
+                status.textContent = 'Saved ✓';
+                setTimeout(() => { popover.classList.remove('open'); status.textContent = ''; }, 900);
+            } catch (e) {
+                status.textContent = 'Failed — try again.';
+            } finally {
+                saveBtn.disabled = false;
+            }
+        });
     })();
     </script>
 </body>

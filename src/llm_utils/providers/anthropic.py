@@ -2,9 +2,10 @@
 import os
 import anthropic
 
-
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+_DEFAULT_MODEL = "claude-sonnet-4-6"
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", _DEFAULT_MODEL)
 _client = None
+
 
 def _get_client():
     global _client
@@ -13,12 +14,20 @@ def _get_client():
     return _client
 
 
+def _get_model() -> str:
+    try:
+        from src.db.database import get_config
+        return get_config("anthropic_model") or ANTHROPIC_MODEL
+    except Exception:
+        return ANTHROPIC_MODEL
+
+
 def complete(prompt: str, tools: list = None, tool_handlers: dict = None) -> str:
     """Single-turn completion with optional tool use."""
     if tools:
         return _tool_loop([{"role": "user", "content": prompt}], tools, tool_handlers)
     message = _get_client().messages.create(
-        model=ANTHROPIC_MODEL,
+        model=_get_model(),
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -30,7 +39,7 @@ def chat(system: str, messages: list, tools: list = None, tool_handlers: dict = 
     if tools:
         return _tool_loop(messages, tools, tool_handlers, system=system)
     message = _get_client().messages.create(
-        model=ANTHROPIC_MODEL,
+        model=_get_model(),
         max_tokens=2048,
         system=system,
         messages=messages,
@@ -47,7 +56,7 @@ def _tool_loop(messages: list, tools: list, tool_handlers: dict, system: str = N
 
     for _ in range(_MAX_TOOL_ITERATIONS):
         response = _get_client().messages.create(
-            model=ANTHROPIC_MODEL,
+            model=_get_model(),
             max_tokens=2048,
             tools=tools,
             messages=messages,

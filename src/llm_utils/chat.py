@@ -2,7 +2,7 @@
 import importlib
 import os
 
-from src.db.database import get_profile, get_all_jobs, get_job, get_all_cv_versions, get_cv_version, get_master_cv
+from src.db.database import get_profile, get_all_jobs, get_job, get_all_cv_versions, get_cv_version, get_master_cv, get_config
 from src.llm_utils.context import format_job_list, format_job, format_cv_list, format_cv
 from src.llm_utils.search import get_search_fn
 from src.cv_tailor import generate_cv_tailor
@@ -112,7 +112,7 @@ _TAILOR_CV_TOOL = {
 
 
 def _load_provider():
-    provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
+    provider_name = get_config("llm_provider") or os.environ.get("LLM_PROVIDER", "anthropic")
     return importlib.import_module(f"src.llm_utils.providers.{provider_name}")
 
 

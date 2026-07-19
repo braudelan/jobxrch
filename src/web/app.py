@@ -27,6 +27,8 @@ from src.db.database import (
     get_cv_version,
     get_job_cv_versions,
     get_job_events,
+    get_config,
+    set_config,
 )
 from src.scraper.fetcher import ingest_job_from_url
 from src.llm_utils.evaluate import evaluate_job
@@ -286,11 +288,27 @@ class ChatRequest(BaseModel):
 @app.get("/chat", response_class=HTMLResponse)
 def chat_page(request: Request):
     messages = get_messages()
+    current_provider = get_config("llm_provider") or os.environ.get("LLM_PROVIDER", "anthropic")
+    current_models = {
+        p: get_config(f"{p}_model") or os.environ.get(_PROVIDER_MODEL_ENV_VARS.get(p, ""), "") or _PROVIDER_DEFAULT_MODELS.get(p, "")
+        for p in _KNOWN_PROVIDERS
+        if p in _PROVIDER_DEFAULT_MODELS
+    }
+    available = {
+        p: (os.environ.get(_PROVIDER_KEY_VARS[p]) is not None if p in _PROVIDER_KEY_VARS else True)
+        for p in _KNOWN_PROVIDERS
+    }
     return templates.TemplateResponse(
         "chat.html",
         {
             "request": request,
             "messages": messages,
+            "current_provider": current_provider,
+            "current_model": current_models.get(current_provider, ""),
+            "providers": _KNOWN_PROVIDERS,
+            "available": available,
+            "current_models": current_models,
+            "provider_default_models": _PROVIDER_DEFAULT_MODELS,
         },
     )
 
@@ -342,3 +360,66 @@ def profile_page(request: Request):
 def profile_save(content: str = Form(...)):
     save_profile(content)
     return RedirectResponse("/profile", status_code=303)
+
+
+# --- Settings ---
+
+_KNOWN_PROVIDERS = ["anthropic", "gemini", "ollama"]
+_PROVIDER_KEY_VARS = {"anthropic": "ANTHROPIC_API_KEY", "gemini": "GEMINI_API_KEY"}
+_PROVIDER_DEFAULT_MODELS = {"anthropic": "claude-sonnet-4-6", "gemini": "gemini-2.0-flash"}
+_PROVIDER_MODEL_ENV_VARS = {"anthropic": "ANTHROPIC_MODEL", "gemini": "GEMINI_MODEL"}
+
+
+@app.get("/settings", response_class=HTMLResponse)
+def settings_page(request: Request):
+    current_provider = get_config("llm_provider") or os.environ.get("LLM_PROVIDER", "anthropic")
+    available = {
+        p: (os.environ.get(_PROVIDER_KEY_VARS[p]) is not None if p in _PROVIDER_KEY_VARS else True)
+        for p in _KNOWN_PROVIDERS
+    }
+    current_models = {
+        p: get_config(f"{p}_model") or os.environ.get(_PROVIDER_MODEL_ENV_VARS.get(p, ""), "") or _PROVIDER_DEFAULT_MODELS.get(p, "")
+        for p in _KNOWN_PROVIDERS
+        if p in _PROVIDER_DEFAULT_MODELS
+    }
+    return templates.TemplateResponse(
+        "settings.html",
+        {
+            "request": request,
+            "current_provider": current_provider,
+            "providers": _KNOWN_PROVIDERS,
+            "available": available,
+            "current_models": current_models,
+            "provider_default_models": _PROVIDER_DEFAULT_MODELS,
+        },
+    )
+
+
+@app.post("/settings")
+def settings_save(
+    provider: str = Form(...),
+    anthropic_model: str = Form(""),
+    gemini_model: str = Form(""),
+):
+    if provider not in _KNOWN_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
+    set_config("llm_provider", provider)
+    if anthropic_model.strip():
+        set_config("anthropic_model", anthropic_model.strip())
+    if gemini_model.strip():
+        set_config("gemini_model", gemini_model.strip())
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/api/settings")
+async def api_settings_save(request: Request):
+    data = await request.json()
+    provider = data.get("provider", "")
+    if provider not in _KNOWN_PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
+    set_config("llm_provider", provider)
+    for p in _KNOWN_PROVIDERS:
+        model = data.get(f"{p}_model", "").strip()
+        if model:
+            set_config(f"{p}_model", model)
+    return JSONResponse({"ok": True})

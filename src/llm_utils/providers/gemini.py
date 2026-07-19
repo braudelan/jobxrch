@@ -3,7 +3,8 @@ import os
 from google import genai
 from google.genai import types
 
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+_DEFAULT_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", _DEFAULT_MODEL)
 
 _client = None
 
@@ -13,6 +14,14 @@ def _get_client():
     if _client is None:
         _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     return _client
+
+
+def _get_model() -> str:
+    try:
+        from src.db.database import get_config
+        return get_config("gemini_model") or GEMINI_MODEL
+    except Exception:
+        return GEMINI_MODEL
 
 
 _JSON_TYPE_MAP = {
@@ -52,11 +61,51 @@ def _to_google_tools(tools: list[dict]) -> list[types.Tool]:
 def _to_google_contents(messages: list[dict]) -> list[types.Content]:
     """Convert Anthropic-style message dicts to Google Content objects."""
     result = []
+    tool_id_to_name: dict[str, str] = {}
+
     for msg in messages:
         role = "model" if msg["role"] == "assistant" else "user"
         content = msg["content"]
+
         if isinstance(content, str):
             result.append(types.Content(role=role, parts=[types.Part(text=content)]))
+            continue
+
+        if not isinstance(content, list):
+            continue
+
+        parts = []
+        for block in content:
+            btype = block.get("type")
+            if btype == "text" and block.get("text"):
+                parts.append(types.Part(text=block["text"]))
+            elif btype == "tool_use":
+                tool_id_to_name[block["id"]] = block["name"]
+                parts.append(types.Part(
+                    function_call=types.FunctionCall(
+                        name=block["name"],
+                        args=block.get("input", {}),
+                    )
+                ))
+            elif btype == "tool_result":
+                tool_use_id = block.get("tool_use_id", "")
+                name = tool_id_to_name.get(tool_use_id, tool_use_id)
+                tool_content = block.get("content", "")
+                if isinstance(tool_content, list):
+                    tool_content = " ".join(
+                        b["text"] for b in tool_content
+                        if isinstance(b, dict) and b.get("type") == "text" and b.get("text")
+                    )
+                parts.append(types.Part(
+                    function_response=types.FunctionResponse(
+                        name=name,
+                        response={"result": tool_content},
+                    )
+                ))
+
+        if parts:
+            result.append(types.Content(role=role, parts=parts))
+
     return result
 
 
@@ -68,7 +117,7 @@ def complete(prompt: str, tools: list = None, tool_handlers: dict = None) -> str
         return _tool_loop(contents, config, tool_handlers)
 
     response = _get_client().models.generate_content(
-        model=GEMINI_MODEL,
+        model=_get_model(),
         contents=prompt,
     )
     return response.text
@@ -84,7 +133,7 @@ def chat(system: str, messages: list[dict], tools: list = None, tool_handlers: d
 
     if not tools:
         response = _get_client().models.generate_content(
-            model=GEMINI_MODEL,
+            model=_get_model(),
             contents=contents,
             config=config,
         )
@@ -100,7 +149,7 @@ def _tool_loop(contents: list, config: types.GenerateContentConfig, tool_handler
     """Agentic tool-use loop. Returns the final text reply."""
     for _ in range(_MAX_TOOL_ITERATIONS):
         response = _get_client().models.generate_content(
-            model=GEMINI_MODEL,
+            model=_get_model(),
             contents=contents,
             config=config,
         )

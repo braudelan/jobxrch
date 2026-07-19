@@ -5,6 +5,7 @@ import importlib
 from dotenv import load_dotenv
 from pydantic import BaseModel, ValidationError
 import json_repair
+from src.db.database import get_config
 
 load_dotenv(override=True)
 
@@ -32,7 +33,7 @@ _SEARCH_TOOL = {
 
 
 def _load_provider():
-    provider_name = os.environ.get("LLM_PROVIDER", "anthropic")
+    provider_name = get_config("llm_provider") or os.environ.get("LLM_PROVIDER", "anthropic")
     return importlib.import_module(f"src.llm_utils.providers.{provider_name}")
 
 

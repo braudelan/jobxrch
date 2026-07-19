@@ -112,6 +112,12 @@ def init_db() -> None:
                 timestamp   TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS config (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
         # Backfill: create an "ingested" event for jobs that have none
         conn.execute("""
             INSERT INTO job_events (job_id, event_type, timestamp)
@@ -416,6 +422,20 @@ def save_cv_version(
             (label, content, job_id, parent_id, datetime.now(timezone.utc).isoformat()),
         )
         return cur.lastrowid
+
+
+def get_config(key: str, default: Optional[str] = None) -> Optional[str]:
+    with _connect() as conn:
+        row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else default
+
+
+def set_config(key: str, value: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
 
 
 def log_llm_call(

@@ -71,6 +71,61 @@ def test_to_google_contents_maps_roles():
     assert result[1].parts[0].text == "hello"
 
 
+def test_to_google_contents_tool_use_blocks():
+    messages = [
+        {"role": "user", "content": "search for me"},
+        {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "I'll search."},
+                {"type": "tool_use", "id": "tu_1", "name": "search_web", "input": {"query": "python"}},
+            ],
+        },
+        {
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": "tu_1", "content": "Python is a language."},
+            ],
+        },
+    ]
+    result = _to_google_contents(messages)
+    assert len(result) == 3
+
+    # user text
+    assert result[0].parts[0].text == "search for me"
+
+    # assistant: text + function_call
+    assert result[1].role == "model"
+    assert result[1].parts[0].text == "I'll search."
+    fc = result[1].parts[1].function_call
+    assert fc.name == "search_web"
+    assert dict(fc.args) == {"query": "python"}
+
+    # user: function_response — name resolved from id
+    assert result[2].role == "user"
+    fr = result[2].parts[0].function_response
+    assert fr.name == "search_web"
+    assert fr.response == {"result": "Python is a language."}
+
+
+def test_to_google_contents_tool_result_list_content():
+    messages = [
+        {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "tu_2", "name": "get_job_list", "input": {}},
+        ]},
+        {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "tu_2", "content": [
+                {"type": "text", "text": "Job A"},
+                {"type": "text", "text": "Job B"},
+            ]},
+        ]},
+    ]
+    result = _to_google_contents(messages)
+    fr = result[1].parts[0].function_response
+    assert fr.name == "get_job_list"
+    assert fr.response == {"result": "Job A Job B"}
+
+
 # --- complete ---
 def test_complete_returns_text():
     with patch("src.llm_utils.providers.gemini._get_client", return_value=_mock_client("Hello!")):
