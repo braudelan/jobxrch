@@ -146,6 +146,7 @@
         col.col-note    { width: 38px; }
         col.col-status  { width: 155px; }
         col.col-score   { width: 58px; }
+        col.col-date    { width: 84px; }
         col.col-edit    { width: 36px; }
         col.col-delete  { width: 36px; }
 
@@ -333,8 +334,15 @@
             <button class="pill active" data-filter="in-process">In Process</button>
             <button class="pill active" data-filter="offer">Offer</button>
             <button class="pill" data-filter="rejected">Rejected</button>
+            <select id="score-filter" style="margin-left:auto;font-size:0.75rem;padding:0.18rem 0.5rem;height:auto;margin-bottom:0;width:auto;">
+                <option value="">Any score</option>
+                <option value="4">≥ 4</option>
+                <option value="6" selected>≥ 6</option>
+                <option value="7">≥ 7</option>
+                <option value="8">≥ 8</option>
+            </select>
             <input id="search" type="search" placeholder="Search…" autocomplete="off"
-                   style="margin-left:auto;width:180px;font-size:0.75rem;padding:0.18rem 0.6rem;height:auto;margin-bottom:0;">
+                   style="width:180px;font-size:0.75rem;padding:0.18rem 0.6rem;height:auto;margin-bottom:0;">
         </div>
 
         <table>
@@ -344,6 +352,7 @@
                 <col class="col-note">
                 <col class="col-status">
                 <col class="col-score">
+                <col class="col-date">
                 <col class="col-edit">
                 <col class="col-delete">
             </colgroup>
@@ -354,13 +363,14 @@
                     <th>Notes</th>
                     <th data-sort="3">Status</th>
                     <th data-sort="4" class="col-score">Score</th>
+                    <th data-sort="5">Date Saved</th>
                     <th></th>
                     <th></th>
                 </tr>
             </thead>
             <tbody>
             {% for job in jobs %}
-                <tr class="job-row" data-status="{{ job.status }}" data-job-id="{{ job.id }}" onclick="toggleExpand(this, event)">
+                <tr class="job-row" data-status="{{ job.status }}" data-job-id="{{ job.id }}" data-score="{{ job.score or '' }}" onclick="toggleExpand(this, event)">
 
                     <td title="Click to expand summary">
                         <span>{{ job.company }}</span>
@@ -408,6 +418,8 @@
                         {% endif %}
                     </td>
 
+                    <td data-sort-val="{{ job.scraped_at[:10] | replace('-', '') }}"><span class="meta">{{ job.scraped_at[:10] }}</span></td>
+
                     <td onclick="event.stopPropagation()">
                         <a href="/jobs/{{ job.id }}/edit" class="btn-sm" title="Edit job details">✏</a>
                     </td>
@@ -420,7 +432,7 @@
 
                 </tr>
                 <tr class="expand-row" id="expand-{{ job.id }}">
-                    <td colspan="7">
+                    <td colspan="8">
                         <div class="expand-content">
                             {% if job.summary %}
                                 {{ job.summary }}
@@ -509,8 +521,9 @@ document.querySelectorAll('thead th[data-sort]').forEach(th => {
         th.classList.add(asc ? 'sort-asc' : 'sort-desc');
 
         jobRows.sort((a, b) => {
-            const aText = a.cells[col]?.innerText.trim() ?? '';
-            const bText = b.cells[col]?.innerText.trim() ?? '';
+            const cellA = a.cells[col], cellB = b.cells[col];
+            const aText = cellA?.dataset?.sortVal ?? cellA?.innerText.trim() ?? '';
+            const bText = cellB?.dataset?.sortVal ?? cellB?.innerText.trim() ?? '';
             const aNum = parseFloat(aText), bNum = parseFloat(bText);
             const cmp = (!isNaN(aNum) && !isNaN(bNum)) ? aNum - bNum : aText.localeCompare(bText);
             return asc ? cmp : -cmp;
@@ -532,11 +545,14 @@ if (scoreTh) { scoreTh.classList.add('sort-asc'); scoreTh.click(); }
 function applyFilter() {
     const active = new Set([...document.querySelectorAll('.pill.active')].map(p => p.dataset.filter));
     const q = (document.getElementById('search')?.value ?? '').toLowerCase().trim();
+    const minScore = parseFloat(document.getElementById('score-filter')?.value) || 0;
     document.querySelectorAll('.job-row').forEach(row => {
         const statusOk = active.has(row.dataset.status);
         const text = row.innerText.toLowerCase();
         const searchOk = !q || text.includes(q);
-        const show = statusOk && searchOk;
+        const score = parseFloat(row.dataset.score);
+        const scoreOk = !minScore || (!isNaN(score) && score >= minScore);
+        const show = statusOk && searchOk && scoreOk;
         row.style.display = show ? '' : 'none';
         const exp = document.getElementById('expand-' + row.dataset.jobId);
         if (exp && !show) { exp.style.display = 'none'; exp.classList.remove('open'); }
@@ -544,6 +560,7 @@ function applyFilter() {
 }
 document.querySelectorAll('.pill').forEach(p => p.addEventListener('click', () => { p.classList.toggle('active'); applyFilter(); }));
 document.getElementById('search')?.addEventListener('input', applyFilter);
+document.getElementById('score-filter')?.addEventListener('change', applyFilter);
 applyFilter();
 
 // ── Expand row ─────────────────────────────────────────────
