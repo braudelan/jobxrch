@@ -51,3 +51,6 @@ data/*
 
 # Claude
 .claude/
+
+# Notebooks / scratch
+notebooks/
