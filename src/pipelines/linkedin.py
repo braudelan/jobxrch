@@ -19,7 +19,7 @@ def run():
         )
         page = context.new_page()
 
-        page.goto("https://www.linkedin.com/my-items/saved-jobs/")
+        page.goto("https://www.linkedin.com/jobs-tracker/")
         if "login" in page.url or "authwall" in page.url:
             print(
                 "Not logged in. Please log in the browser window, then press Enter..."

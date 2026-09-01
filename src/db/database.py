@@ -100,9 +100,14 @@ def init_db() -> None:
                 model            TEXT NOT NULL,
                 timestamp        TEXT NOT NULL,
                 latency_ms       INTEGER,
-                cost_usd         REAL
+                cost_usd         REAL,
+                job_id           INTEGER REFERENCES jobs(id)
             )
         """)
+        # Migration: add job_id to existing raw_llm_log rows
+        log_cols = {row[1] for row in conn.execute("PRAGMA table_info(raw_llm_log)")}
+        if "job_id" not in log_cols:
+            conn.execute("ALTER TABLE raw_llm_log ADD COLUMN job_id INTEGER REFERENCES jobs(id)")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS job_events (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -447,14 +452,15 @@ def log_llm_call(
     prompt_content: Optional[str] = None,
     latency_ms: Optional[int] = None,
     cost_usd: Optional[float] = None,
+    job_id: Optional[int] = None,
 ) -> None:
     """Log an LLM API call to the raw_llm_log table."""
     with _connect() as conn:
         conn.execute(
             """
             INSERT INTO raw_llm_log
-            (run_id, task_type, input_payload, output_payload, prompt_content, model, timestamp, latency_ms, cost_usd)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (run_id, task_type, input_payload, output_payload, prompt_content, model, timestamp, latency_ms, cost_usd, job_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run_id,
@@ -466,5 +472,6 @@ def log_llm_call(
                 datetime.now(timezone.utc).isoformat(),
                 latency_ms,
                 cost_usd,
+                job_id,
             ),
         )

@@ -90,27 +90,7 @@ def _build_prompt(
         master_profile: The candidate's consolidated master profile
         template: The static CV template with <generated> markers
         preferences: Learned user preferences to inject into the prompt (empty by default)
-
-    Returns:
-        Formatted prompt ready for LLM completion
-    """
-    preferences_section = (
-        f"\nLearned Preferences:\n{preferences}\n" if preferences.strip() else ""
-    )
-
-    prompt = f"""You are an expert resume writer tailoring a candidate's CV for a specific job.
-
-You have:
-1. The candidate's comprehensive master profile (with clear section headers)
-2. A job description they're applying for
-3. A CV template with static (fixed) and generated (variable) fields
-{preferences_section}
-Your task: Fill ALL <generated> fields in the template with content optimized for the job.
-
-CRITICAL RULES:
-- Keep ALL fixed fields exactly as provided (company names, titles, periods, all education)
-- Generate variable numbers of skill categories and bullets per role — the template shows examples, but you should generate as many as appropriate for the job
-- For EVERY generated field, cite specific named section headers from the master profile in source_sections
+,
 - Never invent facts not present in the master profile
 - Ensure bullets are specific, quantified, and directly relevant to the job
 - Return ONLY valid JSON conforming to the template structure — no markdown, no prose
@@ -189,6 +169,7 @@ def generate_cv_tailor(
         prompt_content=prompt,
         model=os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
         latency_ms=latency_ms,
+        job_id=job_id,
     )
 
     return result, cv_id
