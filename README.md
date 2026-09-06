@@ -42,6 +42,13 @@ src/
 ├── scraper/              # LinkedIn scraper + JD fetcher
 ├── pipelines/            # Orchestration (LinkedIn pipeline)
 └── web/                  # FastAPI dashboard + UI
+
+eval/                     # Offline LLM evaluation (llmEV) — reads raw_llm_log, never imported by src/
+├── cv_tailor_quality_contract.md  # Scoring rubric and architecture spec
+├── judge.py              # Generic LLM-as-judge primitive (reusable across features)
+├── cv_tailor_scorer.py   # cv_tailor-specific Tier 1/2/3 scoring logic
+├── db.py                 # Reads raw_llm_log, writes cv_tailor_scores
+└── run_scorer.py         # CLI runner
 ```
 
 > **Note:** The current layout is transitional. `cv_tailor.py` sits at the `src/` root while other main features (`evaluate`, `chat`) live under `llm_utils/`. As the feature set grows, main features will likely move into dedicated top-level packages under `src/` (e.g. `src/cv_tailor/`, `src/evaluate/`), with `llm_utils/` reduced to shared provider and utility code.
@@ -75,8 +82,8 @@ The master profile is a structured markdown document merging raw CV and stated g
 ### Ingest Pipeline
 LinkedIn scraper (Playwright-based), manual URL paste with async background fetching, and direct manual entry. All sources normalize to the same job schema.
 
-### LLM Evaluation (llmEV) *(in design)*
-Reads `raw_llm_log` to score first-shot output quality over time. NLI entailment per section against the master profile is the scoring function. Operates independently of the features that generate the logs.
+### LLM Evaluation (llmEV)
+Offline scoring pipeline that reads `raw_llm_log` to evaluate first-shot output quality without instrumenting the features that produce it. Each generated field is scored on two independent axes: **grounding** (does it follow from the cited profile sections?) and **relevance** (does it serve the job description?). Scores are written to `cv_tailor_scores` and join naturally to `raw_llm_log` and `jobs` for trend analysis. See [`eval/README.md`](eval/README.md) for details.
 
 ---
 
@@ -101,6 +108,12 @@ python main.py evaluate-all
 # Start the web dashboard (default: localhost:8000)
 python main.py dashboard
 python main.py dashboard --port 8080
+
+# Score cv_tailor generations (Tier 1 deterministic + Tier 2 grounding + Tier 3 relevance)
+python -m eval.run_scorer
+
+# Deterministic checks only — zero LLM judge calls, fast, good for validating historical data
+python -m eval.run_scorer --max-tier 1
 ```
 
 ### Setup
