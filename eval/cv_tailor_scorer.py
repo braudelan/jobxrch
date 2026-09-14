@@ -29,7 +29,7 @@ def extract_profile_sections(profile_text: str) -> dict[str, str]:
         if line.startswith("## "):
             if current_name is not None:
                 sections[current_name] = "\n".join(current_lines).strip()
-            current_name = line[3:].strip()
+            current_name = line[3:].strip().lower()
             current_lines = []
         elif current_name is not None:
             current_lines.append(line)
@@ -108,6 +108,7 @@ def score_log_entry(log_entry: dict, *, max_tier: int = 3) -> list[dict]:
 
     records = []
     for context, title, text, source_sections in _iter_units(output_payload):
+        source_sections = [s.lower() for s in source_sections]
         record = {
             "run_id": log_entry["run_id"],
             "log_id": log_entry["id"],

@@ -7,7 +7,7 @@ import uuid
 import importlib
 from pathlib import Path
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from jinja2 import Template
 
 
@@ -48,6 +48,17 @@ class CVTailorResult(BaseModel):
     experience: list[ExperienceEntry]
     education: list[dict]
 
+    @model_validator(mode='after')
+    def _normalize_source_sections(self) -> 'CVTailorResult':
+        self.summary.source_sections = [s.lower() for s in self.summary.source_sections]
+        for skill in self.skills:
+            skill.source_sections = [s.lower() for s in skill.source_sections]
+        for exp in self.experience:
+            exp.source_sections = [s.lower() for s in exp.source_sections]
+            for bullet in exp.bullets:
+                bullet.source_sections = [s.lower() for s in bullet.source_sections]
+        return self
+
 
 # ============================================================================
 # UTILITIES
@@ -79,6 +90,11 @@ def _load_cv_template() -> dict:
         return json.load(f)
 
 
+def _extract_section_names(profile_text: str) -> list[str]:
+    """Extract ## section header names from the master profile."""
+    return [line[3:].strip().lower() for line in profile_text.splitlines() if line.startswith("## ")]
+
+
 def _build_prompt(
     job_description: str, master_profile: str, template: dict, preferences: str = ""
 ) -> str:
@@ -86,6 +102,9 @@ def _build_prompt(
     preferences_section = (
         f"\nLearned Preferences:\n{preferences}\n" if preferences.strip() else ""
     )
+
+    section_names = _extract_section_names(master_profile)
+    sections_list = "\n".join(f"  - {s}" for s in section_names)
 
     prompt = f"""You are an expert resume writer tailoring a candidate's CV for a specific job.
 
@@ -99,10 +118,14 @@ Your task: Fill ALL <generated> fields in the template with content optimized fo
 CRITICAL RULES:
 - Keep ALL fixed fields exactly as provided (company names, titles, periods, all education)
 - Generate variable numbers of skill categories and bullets per role — the template shows examples, but you should generate as many as appropriate for the job
-- For EVERY generated field, cite specific named section headers from the master profile in source_sections
+- For EVERY generated field, populate source_sections with the names of the profile sections you drew from
+- source_sections MUST use the EXACT section header names listed below — do not abbreviate, paraphrase, or invent names
 - Never invent facts not present in the master profile
 - Ensure bullets are specific, quantified, and directly relevant to the job
 - Return ONLY valid JSON conforming to the template structure — no markdown, no prose
+
+Valid profile section names (use these exactly in source_sections):
+{sections_list}
 
 Master Profile:
 {master_profile}

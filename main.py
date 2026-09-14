@@ -7,6 +7,9 @@ Uses Click for CLI and Uvicorn for the dashboard server.
 
 import click
 import uvicorn
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 
 @click.group()
@@ -60,6 +63,27 @@ def evaluate_all(force):
             click.echo(f"ERROR: {e}")
 
     click.echo("Done.")
+
+
+@cli.command()
+@click.argument("job_id", type=int)
+def tailor(job_id):
+    """Generate a tailored CV for a job (by ID)."""
+    from src.db.database import init_db, get_job
+    from src.cv_tailor import generate_cv_tailor
+
+    init_db()
+    job = get_job(job_id)
+    if not job:
+        click.echo(f"Job {job_id} not found.")
+        return
+    if not job.get("description"):
+        click.echo(f"Job {job_id} has no description — cannot tailor.")
+        return
+
+    click.echo(f"Tailoring CV for: {job['job_title']} @ {job['company']} ... ", nl=False)
+    result, cv_id = generate_cv_tailor(job["description"], job_id=job_id)
+    click.echo(f"done (cv_id={cv_id})")
 
 
 @cli.command()
