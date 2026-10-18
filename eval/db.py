@@ -21,24 +21,31 @@ def init_scores_table() -> None:
     with _connect() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS cv_tailor_scores (
-                id               INTEGER PRIMARY KEY AUTOINCREMENT,
-                log_id           INTEGER NOT NULL REFERENCES raw_llm_log(id),
-                job_id           INTEGER REFERENCES jobs(id),
-                timestamp        TEXT NOT NULL,
-                model            TEXT NOT NULL,
-                context          TEXT NOT NULL,
-                bullet_title     TEXT NOT NULL,
-                bullet_text      TEXT NOT NULL,
-                source_sections  TEXT NOT NULL,
-                missing_sections TEXT NOT NULL,
-                reference        TEXT,
-                grounding_score  REAL,
-                grounding_label  TEXT NOT NULL,
-                relevance_score  REAL,
-                relevance_label  TEXT,
-                scored_at        TEXT NOT NULL
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                log_id               INTEGER NOT NULL REFERENCES raw_llm_log(id),
+                job_id               INTEGER REFERENCES jobs(id),
+                timestamp            TEXT NOT NULL,
+                model                TEXT NOT NULL,
+                context              TEXT NOT NULL,
+                bullet_title         TEXT NOT NULL,
+                bullet_text          TEXT NOT NULL,
+                source_sections      TEXT NOT NULL,
+                missing_sections     TEXT NOT NULL,
+                reference            TEXT,
+                grounding_score      REAL,
+                grounding_label      TEXT NOT NULL,
+                grounding_rationale  TEXT,
+                relevance_score      REAL,
+                relevance_label      TEXT,
+                relevance_rationale  TEXT,
+                scored_at            TEXT NOT NULL
             )
         """)
+        for col in ("grounding_rationale", "relevance_rationale"):
+            try:
+                conn.execute(f"ALTER TABLE cv_tailor_scores ADD COLUMN {col} TEXT")
+            except Exception:
+                pass  # column already exists
 
 
 def get_cv_tailor_log_entries() -> list[dict]:
@@ -66,9 +73,9 @@ def save_score_records(records: list[dict]) -> None:
                 INSERT INTO cv_tailor_scores (
                     log_id, job_id, timestamp, model, context,
                     bullet_title, bullet_text, source_sections, missing_sections,
-                    reference, grounding_score, grounding_label,
-                    relevance_score, relevance_label, scored_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    reference, grounding_score, grounding_label, grounding_rationale,
+                    relevance_score, relevance_label, relevance_rationale, scored_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     r["log_id"],
@@ -83,8 +90,10 @@ def save_score_records(records: list[dict]) -> None:
                     r.get("reference"),
                     r.get("grounding_score"),
                     r["grounding_label"],
+                    r.get("grounding_rationale"),
                     r.get("relevance_score"),
                     r.get("relevance_label"),
+                    r.get("relevance_rationale"),
                     scored_at,
                 ),
             )

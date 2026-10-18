@@ -62,16 +62,16 @@ def _bucket(score: float, labels: tuple[str, str, str]) -> str:
     return low
 
 
-def score_grounding(reference: str, claim: str) -> tuple[float, str]:
+def score_grounding(reference: str, claim: str) -> tuple[float, str, str]:
     """Tier 2: does the bullet follow from its cited profile sections?"""
     result = judge(reference, claim, _GROUNDING_QUESTION)
-    return result.score, _bucket(result.score, ("supported", "unverified", "hallucinated"))
+    return result.score, _bucket(result.score, ("supported", "unverified", "hallucinated")), result.rationale
 
 
-def score_relevance(claim: str, job_description: str) -> tuple[float, str]:
+def score_relevance(claim: str, job_description: str) -> tuple[float, str, str]:
     """Tier 3: does the bullet serve the job description?"""
     result = judge(job_description, claim, _RELEVANCE_QUESTION)
-    return result.score, _bucket(result.score, ("highly_relevant", "partially_relevant", "irrelevant"))
+    return result.score, _bucket(result.score, ("highly_relevant", "partially_relevant", "irrelevant")), result.rationale
 
 
 def _iter_units(output_payload: dict):
@@ -123,8 +123,10 @@ def score_log_entry(log_entry: dict, *, max_tier: int = 3) -> list[dict]:
             "reference": None,
             "grounding_score": None,
             "grounding_label": "uncited",
+            "grounding_rationale": None,
             "relevance_score": None,
             "relevance_label": None,
+            "relevance_rationale": None,
         }
 
         tier1_label, missing = _tier1_check(source_sections, profile_sections)
@@ -138,10 +140,12 @@ def score_log_entry(log_entry: dict, *, max_tier: int = 3) -> list[dict]:
         record["reference"] = reference
 
         if max_tier >= 2:
-            record["grounding_score"], record["grounding_label"] = score_grounding(reference, text)
+            record["grounding_score"], record["grounding_label"], record["grounding_rationale"] = score_grounding(reference, text)
+        else:
+            record["grounding_label"] = "tier1_pass"
 
         if max_tier >= 3:
-            record["relevance_score"], record["relevance_label"] = score_relevance(text, job_description)
+            record["relevance_score"], record["relevance_label"], record["relevance_rationale"] = score_relevance(text, job_description)
 
         records.append(record)
 
