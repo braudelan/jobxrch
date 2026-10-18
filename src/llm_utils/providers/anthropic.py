@@ -1,5 +1,6 @@
 # src/llm_utils/providers/anthropic.py
 import os
+from typing import Optional
 import anthropic
 
 _DEFAULT_MODEL = "claude-sonnet-4-6"
@@ -22,7 +23,12 @@ def _get_model() -> str:
         return ANTHROPIC_MODEL
 
 
-def complete(prompt: str, tools: list = None, tool_handlers: dict = None) -> str:
+def complete(
+    prompt: str, 
+    tools: list = None,
+    tool_handlers: dict = None, 
+    temperature: Optional[float] = None
+) -> str:
     """Single-turn completion with optional tool use."""
     if tools:
         return _tool_loop([{"role": "user", "content": prompt}], tools, tool_handlers)
@@ -30,11 +36,17 @@ def complete(prompt: str, tools: list = None, tool_handlers: dict = None) -> str
         model=_get_model(),
         max_tokens=2048,
         messages=[{"role": "user", "content": prompt}],
+        **({"temperature": temperature} if temperature is not None else {}),
     )
     return message.content[0].text
 
 
-def chat(system: str, messages: list, tools: list = None, tool_handlers: dict = None) -> str:
+def chat(
+    system: str,
+    messages: list,
+    tools: list = None,
+    tool_handlers: dict = None,
+) -> str:
     """Multi-turn chat with optional tool use."""
     if tools:
         return _tool_loop(messages, tools, tool_handlers, system=system)
@@ -50,7 +62,12 @@ def chat(system: str, messages: list, tools: list = None, tool_handlers: dict = 
 _MAX_TOOL_ITERATIONS = 10
 
 
-def _tool_loop(messages: list, tools: list, tool_handlers: dict, system: str = None) -> str:
+def _tool_loop(
+    messages: list,
+    tools: list,
+    tool_handlers: dict,
+    system: str = None,
+) -> str:
     """Agentic tool-use loop. Returns the final text reply."""
     kwargs = {"system": system} if system else {}
 

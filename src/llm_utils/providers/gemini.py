@@ -1,5 +1,6 @@
 # src/llm_utils/providers/gemini.py
 import os
+from typing import Optional
 from google import genai
 from google.genai import types
 
@@ -109,21 +110,33 @@ def _to_google_contents(messages: list[dict]) -> list[types.Content]:
     return result
 
 
-def complete(prompt: str, tools: list = None, tool_handlers: dict = None) -> str:
+def complete(
+    prompt: str,
+    tools: list = None,
+    tool_handlers: dict = None,
+    temperature: Optional[float] = None,
+) -> str:
     """Single-turn completion with optional tool use."""
     if tools:
         contents = [types.Content(role="user", parts=[types.Part(text=prompt)])]
         config = types.GenerateContentConfig(tools=_to_google_tools(tools))
         return _tool_loop(contents, config, tool_handlers)
 
+    config = types.GenerateContentConfig(temperature=temperature) if temperature is not None else None
     response = _get_client().models.generate_content(
         model=_get_model(),
         contents=prompt,
+        **({"config": config} if config is not None else {}),
     )
     return response.text
 
 
-def chat(system: str, messages: list[dict], tools: list = None, tool_handlers: dict = None) -> str:
+def chat(
+    system: str,
+    messages: list[dict],
+    tools: list = None,
+    tool_handlers: dict = None,
+) -> str:
     """Multi-turn chat with optional tool use."""
     contents = _to_google_contents(messages)
     config = types.GenerateContentConfig(
@@ -145,7 +158,11 @@ def chat(system: str, messages: list[dict], tools: list = None, tool_handlers: d
 _MAX_TOOL_ITERATIONS = 10
 
 
-def _tool_loop(contents: list, config: types.GenerateContentConfig, tool_handlers: dict) -> str:
+def _tool_loop(
+    contents: list,
+    config: types.GenerateContentConfig,
+    tool_handlers: dict,
+) -> str:
     """Agentic tool-use loop. Returns the final text reply."""
     for _ in range(_MAX_TOOL_ITERATIONS):
         response = _get_client().models.generate_content(

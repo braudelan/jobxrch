@@ -67,6 +67,23 @@ def test_complete_tool_loop():
     search_fn.assert_called_once_with("Stripe")
 
 
+# --- complete temperature ---
+def test_complete_forwards_temperature():
+    client = _mock_client("ok")
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=client):
+        complete("prompt", temperature=0)
+    kwargs = client.messages.create.call_args[1]
+    assert kwargs["temperature"] == 0
+
+
+def test_complete_omits_temperature_when_not_set():
+    client = _mock_client("ok")
+    with patch("src.llm_utils.providers.anthropic._get_client", return_value=client):
+        complete("prompt")
+    kwargs = client.messages.create.call_args[1]
+    assert "temperature" not in kwargs
+
+
 # --- chat ---
 def test_chat_returns_text():
     with patch("src.llm_utils.providers.anthropic._get_client", return_value=_mock_client("Great advice!")):

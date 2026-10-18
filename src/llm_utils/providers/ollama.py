@@ -13,6 +13,7 @@ Setup:
 """
 import json
 import os
+from typing import Optional
 from openai import OpenAI
 
 _client = None
@@ -53,6 +54,7 @@ def complete(
     prompt: str,
     tools: list = None,
     tool_handlers: dict = None,
+    temperature: Optional[float] = None,
 ) -> str:
     """Single-turn completion with optional tool use."""
     messages = [{"role": "user", "content": prompt}]
@@ -61,6 +63,7 @@ def complete(
     response = _get_client().chat.completions.create(
         model=_model(),
         messages=messages,
+        **({"temperature": temperature} if temperature is not None else {}),
     )
     return response.choices[0].message.content
 

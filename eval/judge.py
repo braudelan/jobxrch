@@ -59,7 +59,7 @@ def judge(reference: str, claim: str, question: str) -> JudgeResult:
     """
     provider = _load_provider()
     prompt = _JUDGE_PROMPT.format(question=question, reference=reference, claim=claim)
-    raw = provider.complete(prompt)
+    raw = provider.complete(prompt, temperature=0)
     try:
         result = JudgeResult.model_validate(json_repair.loads(raw.strip()))
         result.score = max(0.0, min(1.0, result.score))
